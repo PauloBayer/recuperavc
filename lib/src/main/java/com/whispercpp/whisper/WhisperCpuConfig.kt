@@ -1,0 +1,113 @@
+package com.whispercpp.whisper
+
+import android.util.Log
+import java.io.BufferedReader
+import java.io.FileReader
+
+object WhisperCpuConfig {
+    val preferredThreadCount: Int
+        // MAXIMUM AGGRESSIVE optimization: Use maximum CPU cores for fastest processing
+        get() = getOptimalThreadCount()
+    
+    // Set CPU governor to performance mode if possible (requires root)
+    fun setCpuGovernorToPerformance() {
+        try {
+            val cpuCount = Runtime.getRuntime().availableProcessors()
+            for (i in 0 until cpuCount) {
+                try {
+                    val governorFile = java.io.File("/sys/devices/system/cpu/cpu$i/cpufreq/scaling_governor")
+                    if (governorFile.exists() && governorFile.canWrite()) {
+                        governorFile.writeText("performance")
+                        Log.d("WhisperCpuConfig", "Set CPU $i governor to performance")
+                    }
+                } catch (e: Exception) {
+                    // Silent fail - most devices won't allow this without root
+                }
+            }
+        } catch (e: Exception) {
+            Log.d("WhisperCpuConfig", "Could not set CPU governor to performance: ${e.message}")
+        }
+    }
+    
+    private fun getOptimalThreadCount(): Int {
+        val totalCores = Runtime.getRuntime().availableProcessors()
+        val highPerfCores = CpuInfo.getHighPerfCpuCount()
+        
+        // MAXIMUM AGGRESSIVE threading for whisper.cpp optimization
+        // Use as many cores as possible for fastest processing
+        return when {
+            // For flagship devices (8+ cores): Use ALL cores except 1 (MAXIMUM performance)
+            totalCores >= 8 -> (totalCores - 1).coerceAtLeast(6)
+            
+            // For mid-range devices (4-7 cores): Use ALL cores (MAXIMUM performance)
+            totalCores >= 4 -> totalCores
+            
+            // For low-end devices: Use all available cores
+            else -> totalCores.coerceAtLeast(2)
+        }.also { threadCount ->
+            Log.d("WhisperCpuConfig", "MAXIMUM AGGRESSIVE threading: $threadCount (Total cores: $totalCores, High-perf: $highPerfCores)")
+        }
+    }
+}
+
+private class CpuInfo(private val lines: List<String>) {
+    private fun getHighPerfCpuCount(): Int = try {
+        getHighPerfCpuCountByFrequencies()
+    } catch (e: Exception) {
+        Log.d(LOG_TAG, "Couldn't read CPU frequencies", e)
+        getHighPerfCpuCountByVariant()
+    }
+
+    private fun getHighPerfCpuCountByFrequencies(): Int =
+        getCpuValues(property = "processor") { getMaxCpuFrequency(it.toInt()) }
+            .also { Log.d(LOG_TAG, "Binned cpu frequencies (frequency, count): ${it.binnedValues()}") }
+            .countDroppingMin()
+
+    private fun getHighPerfCpuCountByVariant(): Int =
+        getCpuValues(property = "CPU variant") { it.substringAfter("0x").toInt(radix = 16) }
+            .also { Log.d(LOG_TAG, "Binned cpu variants (variant, count): ${it.binnedValues()}") }
+            .countKeepingMin()
+
+    private fun List<Int>.binnedValues() = groupingBy { it }.eachCount()
+
+    private fun getCpuValues(property: String, mapper: (String) -> Int) = lines
+        .asSequence()
+        .filter { it.startsWith(property) }
+        .map { mapper(it.substringAfter(':').trim()) }
+        .sorted()
+        .toList()
+
+
+    private fun List<Int>.countDroppingMin(): Int {
+        val min = min()
+        return count { it > min }
+    }
+
+    private fun List<Int>.countKeepingMin(): Int {
+        val min = min()
+        return count { it == min }
+    }
+
+    companion object {
+        private const val LOG_TAG = "WhisperCpuConfig"
+
+        fun getHighPerfCpuCount(): Int = try {
+            readCpuInfo().getHighPerfCpuCount()
+        } catch (e: Exception) {
+            Log.d(LOG_TAG, "Couldn't read CPU info", e)
+            // Our best guess -- use more aggressive approach: total CPUs minus 2 (was minus 4)
+            (Runtime.getRuntime().availableProcessors() - 2).coerceAtLeast(2)
+        }
+
+        private fun readCpuInfo() = CpuInfo(
+            BufferedReader(FileReader("/proc/cpuinfo"))
+                .useLines { it.toList() }
+        )
+
+        private fun getMaxCpuFrequency(cpuIndex: Int): Int {
+            val path = "/sys/devices/system/cpu/cpu${cpuIndex}/cpufreq/cpuinfo_max_freq"
+            val maxFreq = BufferedReader(FileReader(path)).use { it.readLine() }
+            return maxFreq.toInt()
+        }
+    }
+}

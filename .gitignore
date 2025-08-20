@@ -1,0 +1,96 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Java/Android
+.gradle/
+.idea/
+local.properties
+*.iml
+*.ipr
+*.iws
+.DS_Store
+/build/
+.cxx/
+captures/
+.externalNativeBuild/
+*.log
+
+# Android Studio
+*.apk
+*.ap_
+*.dex
+*.class
+*.jar
+*.war
+*.ear
+*.hprof
+*.orig
+*.rej
+*.swp
+*.swo
+*.tmp
+*.bak
+*.~ 
+*.keystore
+*.jks
+
+# NDK/CMake
+CMakeFiles/
+CMakeCache.txt
+cmake-build-*/
+build/
+*.so
+*.a
+*.o
+*.obj
+*.d
+*.exe
+*.dll
+*.lib
+*.pdb
+
+# Whisper.cpp
+whisper.cpp/build/
+whisper.cpp/bin/
+whisper.cpp/.vs/
+whisper.cpp/.vscode/
+whisper.cpp/.idea/
+whisper.cpp/*.exe
+whisper.cpp/*.dll
+whisper.cpp/*.so
+whisper.cpp/*.a
+whisper.cpp/*.o
+whisper.cpp/*.obj
+
+# VSCode
+.vscode/
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Python (for scripts)
+__pycache__/
+*.pyc
+*.pyo
+
+# Misc
+*.tmp
+*.bak
+*.swp
+*.swo
+*.swn
