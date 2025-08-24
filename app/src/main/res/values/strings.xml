@@ -1,13 +1,13 @@
 <resources>
-    <string name="app_name">AnalisAVC</string>
+    <string name="app_name">RecuperaVC</string>
     <string name="phrase_to_read">O rato roeu a roupa do rei de Roma</string>
     <string name="start_recording">Começar a gravação</string>
     <string name="stop_recording">Parar gravação</string>
-    <string name="instruction_text">Leia a frase abaixo em voz alta:</string>
-    <string name="results_title">Resultado da Análise</string>
+    <string name="instruction_text">Pronuncie a frase para avaliar sua recuperação:</string>
+    <string name="results_title">Acompanhamento de Progresso</string>
     <string name="wpm_label">Palavras por minuto (WPM):</string>
     <string name="wer_label">Taxa de erro (WER):</string>
-    <string name="assessment_normal">Normal - Fala dentro do esperado</string>
-    <string name="assessment_attention">Atenção - Possível alteração na fala</string>
-    <string name="assessment_concern">Preocupante - Procure ajuda médica</string>
+    <string name="assessment_normal">Progresso excelente - Fala bem desenvolvida</string>
+    <string name="assessment_attention">Progresso consistente - Continue os exercícios</string>
+    <string name="assessment_concern">Mantenha regularidade nos exercícios de reabilitação</string>
 </resources>

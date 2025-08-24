@@ -6,10 +6,8 @@ import java.io.FileReader
 
 object WhisperCpuConfig {
     val preferredThreadCount: Int
-        // MAXIMUM AGGRESSIVE optimization: Use maximum CPU cores for fastest processing
         get() = getOptimalThreadCount()
     
-    // Set CPU governor to performance mode if possible (requires root)
     fun setCpuGovernorToPerformance() {
         try {
             val cpuCount = Runtime.getRuntime().availableProcessors()
@@ -21,7 +19,6 @@ object WhisperCpuConfig {
                         Log.d("WhisperCpuConfig", "Set CPU $i governor to performance")
                     }
                 } catch (e: Exception) {
-                    // Silent fail - most devices won't allow this without root
                 }
             }
         } catch (e: Exception) {
@@ -33,16 +30,11 @@ object WhisperCpuConfig {
         val totalCores = Runtime.getRuntime().availableProcessors()
         val highPerfCores = CpuInfo.getHighPerfCpuCount()
         
-        // MAXIMUM AGGRESSIVE threading for whisper.cpp optimization
-        // Use as many cores as possible for fastest processing
         return when {
-            // For flagship devices (8+ cores): Use ALL cores except 1 (MAXIMUM performance)
             totalCores >= 8 -> (totalCores - 1).coerceAtLeast(6)
             
-            // For mid-range devices (4-7 cores): Use ALL cores (MAXIMUM performance)
             totalCores >= 4 -> totalCores
             
-            // For low-end devices: Use all available cores
             else -> totalCores.coerceAtLeast(2)
         }.also { threadCount ->
             Log.d("WhisperCpuConfig", "MAXIMUM AGGRESSIVE threading: $threadCount (Total cores: $totalCores, High-perf: $highPerfCores)")
@@ -95,7 +87,6 @@ private class CpuInfo(private val lines: List<String>) {
             readCpuInfo().getHighPerfCpuCount()
         } catch (e: Exception) {
             Log.d(LOG_TAG, "Couldn't read CPU info", e)
-            // Our best guess -- use more aggressive approach: total CPUs minus 2 (was minus 4)
             (Runtime.getRuntime().availableProcessors() - 2).coerceAtLeast(2)
         }
 

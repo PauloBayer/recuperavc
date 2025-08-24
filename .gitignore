@@ -75,6 +75,11 @@ whisper.cpp/*.a
 whisper.cpp/*.o
 whisper.cpp/*.obj
 
+# AI Models (very large files)
+app/src/main/assets/models/
+*.bin
+*.ggml
+
 # VSCode
 .vscode/
 

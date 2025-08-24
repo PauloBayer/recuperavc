@@ -55,7 +55,6 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     
     private val expectedPhrase = "o rato roeu a roupa do rei de roma"
     
-    // Optimized dispatcher for high-performance processing
     private val highPerformanceDispatcher = Dispatchers.Default.limitedParallelism(
         Runtime.getRuntime().availableProcessors().coerceAtLeast(4)
     )
@@ -118,14 +117,12 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         isProcessing = true
 
         try {
-            // Use high-performance dispatcher with boosted priority
             withContext(highPerformanceDispatcher) {
                 boostProcessPriority()
                 
                 val data = readAudioSamples(file)
                 val rawText = whisperContext?.transcribeData(data)?.trim() ?: ""
                 
-                // Extract clean text from Whisper output (remove timestamps and formatting)
                 val cleanText = extractCleanText(rawText).lowercase()
                 
                 withContext(Dispatchers.Main) {
@@ -136,7 +133,6 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                     isProcessing = false
                 }
                 
-                // Restore normal priority
                 restoreProcessPriority()
             }
         } catch (e: Exception) {
@@ -148,6 +144,11 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         }
 
         canTranscribe = true
+    }
+
+    fun clearResults() {
+        transcriptionResult = ""
+        analysisResult = null
     }
 
     fun toggleRecord() = viewModelScope.launch {
@@ -185,7 +186,6 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     
     private fun boostProcessPriority() {
         try {
-            // Boost to high priority for faster processing
             Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
             Log.d(LOG_TAG, "Boosted process priority for faster Whisper processing")
         } catch (e: Exception) {
@@ -195,7 +195,6 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     
     private fun restoreProcessPriority() {
         try {
-            // Restore to normal priority
             Process.setThreadPriority(Process.THREAD_PRIORITY_DEFAULT)
             Log.d(LOG_TAG, "Restored normal process priority")
         } catch (e: Exception) {
@@ -204,13 +203,10 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     }
     
     private fun extractCleanText(whisperOutput: String): String {
-        // Remove any content within square brackets (timestamps)
         var cleanText = whisperOutput.replace("\\[.*?\\]".toRegex(), "")
         
-        // Remove extra colons and clean up
         cleanText = cleanText.replace(":", "").trim()
         
-        // Remove extra spaces and punctuation at the end
         cleanText = cleanText.replace("\\s+".toRegex(), " ")
             .replace(".", "")
             .replace(",", "")
@@ -226,7 +222,6 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         val transcribedWords = transcribedText.split("\\s+".toRegex()).filter { it.isNotBlank() }
         
         
-        // Calculate WPM (Words Per Minute)
         val recordingDurationMinutes = recordingDurationMs / 60000.0
         val wpm = if (recordingDurationMinutes > 0) {
             (transcribedWords.size / recordingDurationMinutes).toInt()
@@ -234,7 +229,6 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
             0
         }
         
-        // Calculate WER (Word Error Rate)
         val wer = calculateWER(expectedWords, transcribedWords)
         
         return AnalysisResult(wpm, wer)
@@ -245,20 +239,18 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         
         val dp = Array(expected.size + 1) { IntArray(transcribed.size + 1) }
         
-        // Initialize base cases
         for (i in 0..expected.size) dp[i][0] = i
         for (j in 0..transcribed.size) dp[0][j] = j
         
-        // Fill the DP table using word-level comparison
         for (i in 1..expected.size) {
             for (j in 1..transcribed.size) {
                 dp[i][j] = if (expected[i - 1].equals(transcribed[j - 1], ignoreCase = true)) {
-                    dp[i - 1][j - 1]  // No change needed
+                    dp[i - 1][j - 1]
                 } else {
                     1 + minOf(
-                        dp[i - 1][j],     // Deletion
-                        dp[i][j - 1],     // Insertion
-                        dp[i - 1][j - 1]  // Substitution
+                        dp[i - 1][j],
+                        dp[i][j - 1],
+                        dp[i - 1][j - 1]
                     )
                 }
             }

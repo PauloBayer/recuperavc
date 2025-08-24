@@ -12,7 +12,6 @@ import java.util.concurrent.Executors
 private const val LOG_TAG = "LibWhisper"
 
 class WhisperContext private constructor(private var ptr: Long) {
-    // OPTIMIZED: Use multiple threads for better performance while maintaining thread safety
     private val scope: CoroutineScope = CoroutineScope(
         Executors.newFixedThreadPool(WhisperCpuConfig.preferredThreadCount).asCoroutineDispatcher()
     )
@@ -20,8 +19,7 @@ class WhisperContext private constructor(private var ptr: Long) {
     suspend fun transcribeData(data: FloatArray, printTimestamp: Boolean = true): String = withContext(scope.coroutineContext) {
         require(ptr != 0L)
         
-        // CHUNKED PROCESSING for better performance on large audio
-        if (data.size > 240000) { // More than 15 seconds at 16kHz
+        if (data.size > 240000) {
             return@withContext transcribeDataChunked(data, printTimestamp)
         }
         
@@ -31,13 +29,10 @@ class WhisperContext private constructor(private var ptr: Long) {
     private suspend fun transcribeDataSingle(data: FloatArray, printTimestamp: Boolean): String {
         require(ptr != 0L)
         
-        // PERFORMANCE OPTIMIZATION SEQUENCE
         val startTime = System.currentTimeMillis()
         
-        // Try to set CPU governor to performance mode for maximum speed
         WhisperCpuConfig.setCpuGovernorToPerformance()
         
-        // Set thread priority to maximum for whisper processing
         try {
             Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
             Log.d(LOG_TAG, "Set thread priority to URGENT_AUDIO")
@@ -48,19 +43,16 @@ class WhisperContext private constructor(private var ptr: Long) {
         val numThreads = WhisperCpuConfig.preferredThreadCount
         Log.d(LOG_TAG, "MAXIMUM PERFORMANCE: Using $numThreads threads")
         
-        // Aggressive memory optimization
         val memoryBefore = Runtime.getRuntime().freeMemory()
         System.gc()
         Runtime.getRuntime().gc()
-        Thread.sleep(10) // Give GC time to complete
+        Thread.sleep(10)
         val memoryAfter = Runtime.getRuntime().freeMemory()
         Log.d(LOG_TAG, "Memory freed: ${(memoryAfter - memoryBefore) / 1024 / 1024}MB")
         
-        // Log system optimization info
         Log.d(LOG_TAG, "SYSTEM INFO: ${getOptimizedSystemInfo()}")
         Log.d(LOG_TAG, "AUDIO DATA: ${data.size} samples (${data.size / 16000.0f} seconds of audio)")
         
-        // TRANSCRIPTION PROCESSING
         val transcribeStart = System.currentTimeMillis()
         Log.d(LOG_TAG, "STARTING TRANSCRIPTION with $numThreads threads")
         
@@ -87,11 +79,9 @@ class WhisperContext private constructor(private var ptr: Long) {
             }
         }
         
-        // Reset thread priority after processing
         try {
             Process.setThreadPriority(Process.THREAD_PRIORITY_DEFAULT)
         } catch (e: Exception) {
-            // Ignore
         }
         
         val totalTime = System.currentTimeMillis() - startTime
@@ -103,8 +93,8 @@ class WhisperContext private constructor(private var ptr: Long) {
     private suspend fun transcribeDataChunked(data: FloatArray, printTimestamp: Boolean): String {
         require(ptr != 0L)
         
-        val chunkSize = 160000 // 10 seconds at 16kHz
-        val overlap = 16000    // 1 second overlap
+        val chunkSize = 160000
+        val overlap = 16000
         val chunks = mutableListOf<String>()
         
         Log.d(LOG_TAG, "CHUNKED PROCESSING: ${data.size} samples in chunks of $chunkSize")
@@ -115,13 +105,13 @@ class WhisperContext private constructor(private var ptr: Long) {
             val chunk = data.sliceArray(start until end)
             
             Log.d(LOG_TAG, "Processing chunk: $start-$end (${chunk.size} samples)")
-            val chunkResult = transcribeDataSingle(chunk, false) // No timestamps for chunks
+            val chunkResult = transcribeDataSingle(chunk, false)
             
             if (chunkResult.isNotBlank()) {
                 chunks.add(chunkResult.trim())
             }
             
-            start += chunkSize - overlap // Move with overlap
+            start += chunkSize - overlap
         }
         
         Log.d(LOG_TAG, "CHUNKED PROCESSING COMPLETE: ${chunks.size} chunks processed")
@@ -251,7 +241,6 @@ private class WhisperLib {
             }
         }
 
-        // JNI methods
         external fun initContextFromInputStream(inputStream: InputStream): Long
         external fun initContextFromAsset(assetManager: AssetManager, assetPath: String): Long
         external fun initContext(modelPath: String): Long
@@ -267,8 +256,6 @@ private class WhisperLib {
     }
 }
 
-//  500 -> 00:05.000
-// 6000 -> 01:00.000
 private fun toTimestamp(t: Long, comma: Boolean = false): String {
     var msec = t * 10
     val hr = msec / (1000 * 60 * 60)
