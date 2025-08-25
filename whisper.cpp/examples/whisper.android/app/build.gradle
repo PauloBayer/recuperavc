@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace 'com.whispercppdemo'
+    namespace 'com.recuperavc'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.whispercppdemo"
+        applicationId "com.recuperavc"
         minSdk 26
         targetSdk 34
         versionCode 1

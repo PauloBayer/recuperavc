@@ -1,4 +1,4 @@
-package com.whispercppdemo.ui.main
+package com.recuperavc.ui.main
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.sp
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
-import com.whispercppdemo.R
+import com.recuperavc.R
 
 @Composable
 fun MainScreen(viewModel: MainScreenViewModel) {
