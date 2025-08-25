@@ -1,3 +1,11 @@
+# Para rodar o projeto:
+
+O modelo do Whispper não vem junto com o repositório, pois ele é muito pesado. Ele precisa ser baixado a parte de depois colocado em certa pasta. Siga os passos:
+
+1. Baixe o modelo aqui: https://drive.google.com/file/d/1kajwLNlkBH-_FD3Y5vSH-R8N05lPmUuG/view?usp=sharing
+2. Coloque na pasta: recuperavc\app\src\main\assets\models
+
+
 # AnalisAVC - Detector de AVC por Análise de Fala
 
 ![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)

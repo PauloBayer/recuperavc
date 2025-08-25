@@ -1,4 +1,4 @@
-package com.whispercppdemo.ui.theme
+package com.recupeavc.ui.theme
 
 import android.app.Activity
 import android.os.Build

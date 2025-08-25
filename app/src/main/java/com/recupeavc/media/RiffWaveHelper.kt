@@ -1,4 +1,4 @@
-package com.whispercppdemo.media
+package com.recupeavc.media
 
 import java.io.ByteArrayOutputStream
 import java.io.File
