@@ -1,12 +1,12 @@
-package com.whispercppdemo
+package com.recuperavc
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import com.whispercppdemo.ui.main.MainScreen
-import com.whispercppdemo.ui.main.MainScreenViewModel
-import com.whispercppdemo.ui.theme.WhisperCppDemoTheme
+import com.recuperavc.ui.main.MainScreen
+import com.recuperavc.ui.main.MainScreenViewModel
+import com.recuperavc.ui.theme.WhisperCppDemoTheme
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainScreenViewModel by viewModels { MainScreenViewModel.factory() }

@@ -229,10 +229,13 @@ private class WhisperLib {
                 }
             }
 
-            if (loadVfpv4) {
+            if (loadVfpv4 && tryLoad("whisper_vfpv4")) {
                 Log.d(LOG_TAG, "Loading libwhisper_vfpv4.so")
                 System.loadLibrary("whisper_vfpv4")
-            } else if (loadV8fp16) {
+            } else if (loadV8fp16 && tryLoad("whisper_v8fp16_va")) {
+                Log.d(LOG_TAG, "Loading libwhisper_v8fp16_va.so")
+                System.loadLibrary("whisper_v8fp16_va")
+            } else if (tryLoad("whisper_v8fp16")) {
                 Log.d(LOG_TAG, "Loading libwhisper_v8fp16_va.so")
                 System.loadLibrary("whisper_v8fp16_va")
             } else {
@@ -255,6 +258,11 @@ private class WhisperLib {
         external fun benchGgmlMulMat(nthread: Int): String
     }
 }
+
+private fun tryLoad(name: String): Boolean =
+    try { System.loadLibrary(name); true } catch (e: UnsatisfiedLinkError) {
+        android.util.Log.w("LibWhisper", "Missing $name, falling back", e); false
+    }
 
 private fun toTimestamp(t: Long, comma: Boolean = false): String {
     var msec = t * 10

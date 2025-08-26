@@ -1,4 +1,4 @@
-package com.whispercppdemo.ui.main
+package com.recuperavc.ui.main
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -20,7 +20,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -29,8 +28,7 @@ import androidx.compose.ui.unit.sp
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
-import com.whispercppdemo.R
-import com.whispercppdemo.ui.theme.*
+import com.recuperavc.ui.theme.*
 
 @Composable
 fun MainScreen(viewModel: MainScreenViewModel) {

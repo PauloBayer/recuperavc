@@ -1,4 +1,4 @@
-package com.whispercppdemo.ui.theme
+package com.recuperavc.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

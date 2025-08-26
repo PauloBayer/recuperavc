@@ -1,10 +1,10 @@
-package com.whispercppdemo.recorder
+package com.recuperavc.recorder
 
 import android.annotation.SuppressLint
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
-import com.whispercppdemo.media.encodeWaveFile
+import com.recuperavc.media.encodeWaveFile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.withContext

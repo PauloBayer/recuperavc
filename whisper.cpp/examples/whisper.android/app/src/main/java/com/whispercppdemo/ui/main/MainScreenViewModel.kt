@@ -1,4 +1,4 @@
-package com.whispercppdemo.ui.main
+package com.recuperavc.ui.main
 
 import android.app.Application
 import android.content.Context
@@ -14,9 +14,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.whispercppdemo.media.decodeWaveFile
-import com.whispercppdemo.recorder.Recorder
-import com.whispercpp.whisper.WhisperContext
+import com.recuperavc.media.decodeWaveFile
+import com.recuperavc.recorder.Recorder
+import com.recuperavc.whisper.WhisperContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
