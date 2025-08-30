@@ -25,34 +25,42 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.recuperavc.ui.theme.*
+import com.recuperavc.ui.main.MainScreenViewModel
+import com.recuperavc.ui.main.AnalysisResult
 
 @Composable
-fun MainScreen(viewModel: MainScreenViewModel) {
-    MainScreen(
+fun MainScreen(viewModel: MainScreenViewModel = viewModel(factory = MainScreenViewModel.factory())) {
+    MainScreenContent(
         canTranscribe = viewModel.canTranscribe,
         isRecording = viewModel.isRecording,
         isLoading = viewModel.isLoading,
         isProcessing = viewModel.isProcessing,
         transcriptionResult = viewModel.transcriptionResult,
         analysisResult = viewModel.analysisResult,
+        phraseText = viewModel.phraseText,
         onRecordTapped = viewModel::toggleRecord,
-        onClearResults = viewModel::clearResults
+        onClearResults = {
+            viewModel.clearResults()
+            viewModel.loadNewPhrase()
+        }
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MainScreen(
+private fun MainScreenContent(
     canTranscribe: Boolean,
     isRecording: Boolean,
     isLoading: Boolean,
     isProcessing: Boolean,
     transcriptionResult: String,
     analysisResult: AnalysisResult?,
+    phraseText: String,
     onRecordTapped: () -> Unit,
     onClearResults: () -> Unit
 ) {
@@ -61,11 +69,7 @@ private fun MainScreen(
             .fillMaxSize()
             .background(
                 brush = Brush.radialGradient(
-                    colors = listOf(
-                        GreenLight,
-                        GreenPrimary,
-                        BackgroundGreen
-                    ),
+                    colors = listOf(GreenLight, GreenPrimary, BackgroundGreen),
                     radius = 1200f
                 )
             )
@@ -89,9 +93,7 @@ private fun MainScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(60.dp),
                         color = OnBackground,
@@ -139,7 +141,7 @@ private fun MainScreen(
                 }
 
                 Text(
-                    text = "O rato roeu a roupa do\nrei de roma",
+                    text = phraseText,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = OnBackground,
@@ -180,7 +182,7 @@ private fun RecordingCircles(
 
     val animationDuration = 2000
     val infiniteTransition = rememberInfiniteTransition(label = "recording")
-    
+
     val outerCircleScale by infiniteTransition.animateFloat(
         initialValue = 1f,
         targetValue = 1.3f,
@@ -537,4 +539,3 @@ private fun MetricCard(
         }
     }
 }
-

@@ -15,7 +15,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             WhisperCppDemoTheme {
-                MainScreen(viewModel)
+                MainScreen(viewModel) // ✅ aqui você passa o ViewModel
             }
         }
     }

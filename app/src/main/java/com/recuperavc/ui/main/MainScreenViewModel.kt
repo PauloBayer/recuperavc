@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.recuperavc.library.PhraseLibrary
 
 private const val LOG_TAG = "MainScreenViewModel"
 
@@ -43,6 +44,9 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     var analysisResult by mutableStateOf<AnalysisResult?>(null)
         private set
 
+    var phraseText by mutableStateOf("")
+        private set
+
     private val modelsPath = File(application.filesDir, "models")
     private val samplesPath = File(application.filesDir, "samples")
     private var recorder: Recorder = Recorder()
@@ -50,8 +54,6 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     private var mediaPlayer: MediaPlayer? = null
     private var recordedFile: File? = null
     private var recordingStartTime: Long = 0
-    
-    private val expectedPhrase = "o rato roeu a roupa do rei de roma"
     
     private val highPerformanceDispatcher = Dispatchers.Default.limitedParallelism(
         Runtime.getRuntime().availableProcessors().coerceAtLeast(4)
@@ -67,6 +69,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         try {
             copyAssets()
             loadBaseModel()
+            loadNewPhrase()
             canTranscribe = true
             isLoading = false
         } catch (e: Exception) {
@@ -74,6 +77,10 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
             isLoading = false
         }
     }
+    fun loadNewPhrase() {
+        phraseText = PhraseLibrary.getFrase("curta")
+    }
+
 
     private suspend fun copyAssets() = withContext(Dispatchers.IO) {
         modelsPath.mkdirs()
@@ -214,21 +221,20 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         
         return cleanText
     }
-    
+
     private fun calculateAnalysis(transcribedText: String, recordingDurationMs: Long): AnalysisResult {
-        val expectedWords = expectedPhrase.lowercase().split("\\s+".toRegex())
+        val expectedWords = phraseText.lowercase().split("\\s+".toRegex())
         val transcribedWords = transcribedText.split("\\s+".toRegex()).filter { it.isNotBlank() }
-        
-        
+
         val recordingDurationMinutes = recordingDurationMs / 60000.0
         val wpm = if (recordingDurationMinutes > 0) {
             (transcribedWords.size / recordingDurationMinutes).toInt()
         } else {
             0
         }
-        
+
         val wer = calculateWER(expectedWords, transcribedWords)
-        
+
         return AnalysisResult(wpm, wer)
     }
     
