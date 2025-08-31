@@ -36,8 +36,6 @@ object WhisperCpuConfig {
             totalCores >= 4 -> totalCores
             
             else -> totalCores.coerceAtLeast(2)
-        }.also { threadCount ->
-            Log.d("WhisperCpuConfig", "MAXIMUM AGGRESSIVE threading: $threadCount (Total cores: $totalCores, High-perf: $highPerfCores)")
         }
     }
 }
@@ -52,7 +50,6 @@ private class CpuInfo(private val lines: List<String>) {
 
     private fun getHighPerfCpuCountByFrequencies(): Int =
         getCpuValues(property = "processor") { getMaxCpuFrequency(it.toInt()) }
-            .also { Log.d(LOG_TAG, "Binned cpu frequencies (frequency, count): ${it.binnedValues()}") }
             .countDroppingMin()
 
     private fun getHighPerfCpuCountByVariant(): Int =

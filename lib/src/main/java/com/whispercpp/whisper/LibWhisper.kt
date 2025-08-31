@@ -35,37 +35,20 @@ class WhisperContext private constructor(private var ptr: Long) {
         
         try {
             Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
-            Log.d(LOG_TAG, "Set thread priority to URGENT_AUDIO")
         } catch (e: Exception) {
-            Log.d(LOG_TAG, "Could not set thread priority: ${e.message}")
         }
         
         val numThreads = WhisperCpuConfig.preferredThreadCount
-        Log.d(LOG_TAG, "MAXIMUM PERFORMANCE: Using $numThreads threads")
         
-        val memoryBefore = Runtime.getRuntime().freeMemory()
         System.gc()
         Runtime.getRuntime().gc()
         Thread.sleep(10)
-        val memoryAfter = Runtime.getRuntime().freeMemory()
-        Log.d(LOG_TAG, "Memory freed: ${(memoryAfter - memoryBefore) / 1024 / 1024}MB")
         
-        Log.d(LOG_TAG, "SYSTEM INFO: ${getOptimizedSystemInfo()}")
-        Log.d(LOG_TAG, "AUDIO DATA: ${data.size} samples (${data.size / 16000.0f} seconds of audio)")
         
         val transcribeStart = System.currentTimeMillis()
-        Log.d(LOG_TAG, "STARTING TRANSCRIPTION with $numThreads threads")
         
         WhisperLib.fullTranscribe(ptr, numThreads, data)
         
-        val transcribeTime = System.currentTimeMillis() - transcribeStart
-        val processingTime = System.currentTimeMillis() - startTime
-        Log.d(LOG_TAG, "PERFORMANCE BREAKDOWN:")
-        Log.d(LOG_TAG, "  - Setup time: ${transcribeStart - startTime}ms")
-        Log.d(LOG_TAG, "  - Transcription time: ${transcribeTime}ms")
-        Log.d(LOG_TAG, "  - Total time: ${processingTime}ms")
-        Log.d(LOG_TAG, "  - Audio length: ${data.size} samples")
-        Log.d(LOG_TAG, "  - Performance: ${data.size.toFloat() / transcribeTime}ms samples/ms")
         val textCount = WhisperLib.getTextSegmentCount(ptr)
         val result = buildString {
             for (i in 0 until textCount) {
@@ -84,8 +67,6 @@ class WhisperContext private constructor(private var ptr: Long) {
         } catch (e: Exception) {
         }
         
-        val totalTime = System.currentTimeMillis() - startTime
-        Log.d(LOG_TAG, "PERFORMANCE: Total transcription time: ${totalTime}ms")
         
         return result
     }
@@ -97,14 +78,12 @@ class WhisperContext private constructor(private var ptr: Long) {
         val overlap = 16000
         val chunks = mutableListOf<String>()
         
-        Log.d(LOG_TAG, "CHUNKED PROCESSING: ${data.size} samples in chunks of $chunkSize")
         
         var start = 0
         while (start < data.size) {
             val end = minOf(start + chunkSize, data.size)
             val chunk = data.sliceArray(start until end)
             
-            Log.d(LOG_TAG, "Processing chunk: $start-$end (${chunk.size} samples)")
             val chunkResult = transcribeDataSingle(chunk, false)
             
             if (chunkResult.isNotBlank()) {
@@ -114,7 +93,6 @@ class WhisperContext private constructor(private var ptr: Long) {
             start += chunkSize - overlap
         }
         
-        Log.d(LOG_TAG, "CHUNKED PROCESSING COMPLETE: ${chunks.size} chunks processed")
         return chunks.joinToString(" ")
     }
 
@@ -211,9 +189,7 @@ private class WhisperLib {
                 // armeabi-v7a needs runtime detection support
                 val cpuInfo = cpuInfo()
                 cpuInfo?.let {
-                    Log.d(LOG_TAG, "CPU info: $cpuInfo")
                     if (cpuInfo.contains("vfpv4")) {
-                        Log.d(LOG_TAG, "CPU supports vfpv4")
                         loadVfpv4 = true
                     }
                 }
@@ -221,25 +197,19 @@ private class WhisperLib {
                 // ARMv8.2a needs runtime detection support
                 val cpuInfo = cpuInfo()
                 cpuInfo?.let {
-                    Log.d(LOG_TAG, "CPU info: $cpuInfo")
                     if (cpuInfo.contains("fphp")) {
-                        Log.d(LOG_TAG, "CPU supports fp16 arithmetic")
                         loadV8fp16 = true
                     }
                 }
             }
 
             if (loadVfpv4 && tryLoad("whisper_vfpv4")) {
-                Log.d(LOG_TAG, "Loading libwhisper_vfpv4.so")
                 System.loadLibrary("whisper_vfpv4")
             } else if (loadV8fp16 && tryLoad("whisper_v8fp16_va")) {
-                Log.d(LOG_TAG, "Loading libwhisper_v8fp16_va.so")
                 System.loadLibrary("whisper_v8fp16_va")
             } else if (tryLoad("whisper_v8fp16")) {
-                Log.d(LOG_TAG, "Loading libwhisper_v8fp16_va.so")
                 System.loadLibrary("whisper_v8fp16_va")
             } else {
-                Log.d(LOG_TAG, "Loading libwhisper.so")
                 System.loadLibrary("whisper")
             }
         }
