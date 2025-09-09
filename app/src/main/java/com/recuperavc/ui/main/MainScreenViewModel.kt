@@ -22,6 +22,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
 import com.recuperavc.library.PhraseLibrary
+import com.recuperavc.library.PhraseManager
 
 private const val LOG_TAG = "MainScreenViewModel"
 
@@ -39,6 +40,8 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         private set
     var isProcessing by mutableStateOf(false)
         private set
+    var isCancelling by mutableStateOf(false)
+        private set
     var transcriptionResult by mutableStateOf("")
         private set
     var analysisResult by mutableStateOf<AnalysisResult?>(null)
@@ -54,6 +57,8 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     private var mediaPlayer: MediaPlayer? = null
     private var recordedFile: File? = null
     private var recordingStartTime: Long = 0
+    
+    private val phraseManager = PhraseManager(application)
     
     private val highPerformanceDispatcher = Dispatchers.Default.limitedParallelism(
         Runtime.getRuntime().availableProcessors().coerceAtLeast(4)
@@ -78,7 +83,9 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         }
     }
     fun loadNewPhrase() {
-        phraseText = PhraseLibrary.getFrase("curta")
+        viewModelScope.launch {
+            phraseText = phraseManager.getNextPhrase("curta")
+        }
     }
 
 
@@ -155,6 +162,15 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         transcriptionResult = ""
         analysisResult = null
     }
+    
+    fun cancelRecording() {
+        viewModelScope.launch {
+            isCancelling = true
+            recorder.stopRecording()
+            isRecording = false
+            isCancelling = false
+        }
+    }
 
     fun toggleRecord() = viewModelScope.launch {
         try {
@@ -168,10 +184,23 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                 transcriptionResult = ""
                 analysisResult = null
                 val file = getTempFileForRecording()
-                recorder.startRecording(file) { e ->
+                recorder.startRecording(file, { e ->
                     viewModelScope.launch {
                         withContext(Dispatchers.Main) {
                             isRecording = false
+                        }
+                    }
+                }) { shouldProcess ->
+                    viewModelScope.launch {
+                        withContext(Dispatchers.Main) {
+                            recorder.stopRecording()
+                            isRecording = false
+                            if (shouldProcess) {
+                                val recordingDuration = System.currentTimeMillis() - recordingStartTime
+                                recordedFile?.let { transcribeAudio(it, recordingDuration) }
+                            } else {
+                                Log.d(LOG_TAG, "Gravação cancelada - nenhum áudio detectado")
+                            }
                         }
                     }
                 }
@@ -192,18 +221,14 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     private fun boostProcessPriority() {
         try {
             Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
-            Log.d(LOG_TAG, "Boosted process priority for faster Whisper processing")
         } catch (e: Exception) {
-            Log.w(LOG_TAG, "Failed to boost process priority", e)
         }
     }
     
     private fun restoreProcessPriority() {
         try {
             Process.setThreadPriority(Process.THREAD_PRIORITY_DEFAULT)
-            Log.d(LOG_TAG, "Restored normal process priority")
         } catch (e: Exception) {
-            Log.w(LOG_TAG, "Failed to restore process priority", e)
         }
     }
     
@@ -219,12 +244,19 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
             .replace("?", "")
             .trim()
         
+        
         return cleanText
     }
 
     private fun calculateAnalysis(transcribedText: String, recordingDurationMs: Long): AnalysisResult {
-        val expectedWords = phraseText.lowercase().split("\\s+".toRegex())
-        val transcribedWords = transcribedText.split("\\s+".toRegex()).filter { it.isNotBlank() }
+        val cleanExpectedText = phraseText.lowercase()
+            .replace(Regex("[.,!?;:\"'()\\[\\]{}]"), "")
+            .replace("\\s+".toRegex(), " ")
+            .trim()
+        val expectedWords = cleanExpectedText.split("\\s+".toRegex()).filter { it.isNotBlank() }
+        val transcribedWords = transcribedText.lowercase().split("\\s+".toRegex()).filter { it.isNotBlank() }
+        
+        Log.d(LOG_TAG, "Análise: $expectedWords vs $transcribedWords")
 
         val recordingDurationMinutes = recordingDurationMs / 60000.0
         val wpm = if (recordingDurationMinutes > 0) {
@@ -234,6 +266,8 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         }
 
         val wer = calculateWER(expectedWords, transcribedWords)
+        
+        Log.d(LOG_TAG, "Precisão: ${String.format("%.1f", 100 - wer)}%")
 
         return AnalysisResult(wpm, wer)
     }

@@ -18,8 +18,8 @@ class Recorder {
     )
     private var recorder: AudioRecordThread? = null
 
-    suspend fun startRecording(outputFile: File, onError: (Exception) -> Unit) = withContext(scope.coroutineContext) {
-        recorder = AudioRecordThread(outputFile, onError)
+    suspend fun startRecording(outputFile: File, onError: (Exception) -> Unit, onAutoStop: ((Boolean) -> Unit)? = null) = withContext(scope.coroutineContext) {
+        recorder = AudioRecordThread(outputFile, onError, onAutoStop)
         recorder?.start()
     }
 
@@ -33,10 +33,12 @@ class Recorder {
 
 private class AudioRecordThread(
     private val outputFile: File,
-    private val onError: (Exception) -> Unit
+    private val onError: (Exception) -> Unit,
+    private val onAutoStop: ((Boolean) -> Unit)? = null
 ) :
     Thread("AudioRecorder") {
     private var quit = AtomicBoolean(false)
+    private val silenceDetector = SilenceDetector()
 
     @SuppressLint("MissingPermission")
     override fun run() {
@@ -58,14 +60,31 @@ private class AudioRecordThread(
 
             try {
                 audioRecord.startRecording()
+                silenceDetector.startRecording()
 
                 val allData = mutableListOf<Short>()
 
                 while (!quit.get()) {
                     val read = audioRecord.read(buffer, 0, buffer.size)
                     if (read > 0) {
+                        val currentBuffer = buffer.sliceArray(0 until read)
                         for (i in 0 until read) {
                             allData.add(buffer[i])
+                        }
+                        
+                        if (onAutoStop != null) {
+                            when (silenceDetector.processSamples(currentBuffer)) {
+                                SilenceDetectionResult.STOP_AND_PROCESS -> {
+                                    quit.set(true)
+                                    onAutoStop.invoke(true)
+                                }
+                                SilenceDetectionResult.STOP_NO_AUDIO -> {
+                                    quit.set(true)
+                                    onAutoStop.invoke(false)
+                                }
+                                SilenceDetectionResult.CONTINUE -> {
+                                }
+                            }
                         }
                     } else {
                         throw java.lang.RuntimeException("audioRecord.read returned $read")

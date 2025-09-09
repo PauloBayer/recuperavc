@@ -34,4 +34,8 @@ object PhraseLibrary {
             else -> shortPhrases.random()
         }
     }
+    
+    fun getAllShortPhrases(): List<String> = shortPhrases
+    fun getAllMiddlePhrases(): List<String> = middlePhrases
+    fun getAllLongPhrases(): List<String> = longPhrases
 }
