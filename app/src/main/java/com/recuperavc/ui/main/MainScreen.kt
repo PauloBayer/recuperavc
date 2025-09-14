@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.TrendingUp
@@ -35,11 +36,18 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.recuperavc.ui.theme.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalContext
+import com.recuperavc.data.CurrentUser
+import com.recuperavc.data.db.DbProvider
+import androidx.compose.runtime.collectAsState
 import com.recuperavc.ui.main.MainScreenViewModel
 import com.recuperavc.ui.main.AnalysisResult
 
 @Composable
 fun MainScreen(viewModel: MainScreenViewModel = viewModel(factory = MainScreenViewModel.factory())) {
+    var showHistory by remember { mutableStateOf(false) }
     MainScreenContent(
         canTranscribe = viewModel.canTranscribe,
         isRecording = viewModel.isRecording,
@@ -54,8 +62,12 @@ fun MainScreen(viewModel: MainScreenViewModel = viewModel(factory = MainScreenVi
         onClearResults = {
             viewModel.clearResults()
             viewModel.loadNewPhrase()
-        }
+        },
+        onOpenHistory = { showHistory = true }
     )
+    if (showHistory) {
+        HistoryDialog(onDismiss = { showHistory = false })
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,7 +83,8 @@ private fun MainScreenContent(
     isCancelling: Boolean,
     onRecordTapped: () -> Unit,
     onCancelRecording: () -> Unit,
-    onClearResults: () -> Unit
+    onClearResults: () -> Unit,
+    onOpenHistory: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -89,18 +102,22 @@ private fun MainScreenContent(
                 }
             }
     ) {
-        IconButton(
-            onClick = { },
+        Row(
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp)
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.Close,
-                contentDescription = "Fechar",
-                tint = OnBackground,
-                modifier = Modifier.size(28.dp)
-            )
+            IconButton(onClick = onOpenHistory) {
+                Icon(
+                    imageVector = Icons.Default.History,
+                    contentDescription = "Histórico",
+                    tint = OnBackground,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+            CloseAppButton()
         }
 
         if (isLoading) {
@@ -431,6 +448,65 @@ private fun RecordingCircles(
             }
         }
     }
+}
+
+@Composable
+private fun CloseAppButton() {
+    val context = LocalContext.current
+    IconButton(
+        onClick = {
+            val activity = context as? android.app.Activity
+            activity?.finishAffinity()
+        }
+    ) {
+        Icon(
+            imageVector = Icons.Default.Close,
+            contentDescription = "Fechar",
+            tint = OnBackground,
+            modifier = Modifier.size(28.dp)
+        )
+    }
+}
+
+@Composable
+private fun HistoryDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val db = remember(context) { DbProvider.db(context) }
+    val audioFiles by db.audioFileDao().observeForUser(CurrentUser.ID).collectAsState(initial = emptyList())
+    val audioReports by db.audioReportDao().observeForUser(CurrentUser.ID).collectAsState(initial = emptyList())
+    val coherenceReports by db.coherenceReportDao().observeForUser(CurrentUser.ID).collectAsState(initial = emptyList())
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = GreenDark)) { Text("Fechar", color = Color.White) }
+        },
+        title = { Text("Registros Salvos", color = Color.Black) },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp, max = 480.dp).verticalScroll(rememberScrollState())) {
+                Text("Arquivos de Áudio (${audioFiles.size})", fontWeight = FontWeight.Bold, color = OnBackground)
+                Spacer(Modifier.height(8.dp))
+                audioFiles.take(10).forEach {
+                    val local = java.time.LocalDateTime.ofInstant(it.recordedAt, java.time.ZoneId.systemDefault())
+                    val formatted = local.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
+                    Text("• ${it.fileName} • ${formatted}", fontSize = 12.sp, color = Color.Black)
+                }
+                Spacer(Modifier.height(16.dp))
+                Text("Relatórios de Áudio (${audioReports.size})", fontWeight = FontWeight.Bold, color = OnBackground)
+                Spacer(Modifier.height(8.dp))
+                audioReports.take(10).forEach {
+                    Text("• ${it.description}", fontSize = 12.sp, color = Color.Black)
+                }
+                Spacer(Modifier.height(16.dp))
+                Text("Relatórios de Coerência (${coherenceReports.size})", fontWeight = FontWeight.Bold, color = OnBackground)
+                Spacer(Modifier.height(8.dp))
+                coherenceReports.take(10).forEach {
+                    Text("• score=${it.score} • ${it.description}", fontSize = 12.sp, color = Color.Black)
+                }
+            }
+        },
+        containerColor = Color.White
+    )
 }
 
 @Composable

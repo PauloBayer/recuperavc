@@ -23,6 +23,17 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import com.recuperavc.library.PhraseLibrary
 import com.recuperavc.library.PhraseManager
+import com.recuperavc.data.db.DbProvider
+import com.recuperavc.data.CurrentUser
+import com.recuperavc.models.PatternAudioPhrase
+import com.recuperavc.models.PatternCoherencePhrase
+import com.recuperavc.models.AudioFile
+import com.recuperavc.models.AudioReport
+import com.recuperavc.models.AudioReportGroup
+import com.recuperavc.models.CoherenceReport
+import com.recuperavc.models.CoherenceReportGroup
+import java.time.Instant
+import java.util.UUID
 
 private const val LOG_TAG = "MainScreenViewModel"
 
@@ -52,6 +63,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
 
     private val modelsPath = File(application.filesDir, "models")
     private val samplesPath = File(application.filesDir, "samples")
+    private val recordingsPath = File(application.filesDir, "recordings")
     private var recorder: Recorder = Recorder()
     private var whisperContext: com.whispercpp.whisper.WhisperContext? = null
     private var mediaPlayer: MediaPlayer? = null
@@ -92,6 +104,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     private suspend fun copyAssets() = withContext(Dispatchers.IO) {
         modelsPath.mkdirs()
         samplesPath.mkdirs()
+        recordingsPath.mkdirs()
         application.copyData("samples", samplesPath)
     }
 
@@ -137,12 +150,14 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                 
                 val cleanText = extractCleanText(rawText).lowercase()
                 
+                val analysis = if (cleanText.isNotEmpty()) calculateAnalysis(cleanText, recordingDurationMs) else null
                 withContext(Dispatchers.Main) {
                     transcriptionResult = cleanText
-                    if (cleanText.isNotEmpty()) {
-                        analysisResult = calculateAnalysis(cleanText, recordingDurationMs)
-                    }
+                    analysisResult = analysis
                     isProcessing = false
+                }
+                if (analysis != null) {
+                    persistResults(file, recordingDurationMs, cleanText, analysis)
                 }
                 
                 restoreProcessPriority()
@@ -156,6 +171,61 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         }
 
         canTranscribe = true
+    }
+
+    private suspend fun persistResults(file: File, recordingDurationMs: Long, transcribedText: String, analysis: AnalysisResult) {
+        withContext(Dispatchers.IO) {
+            val db = DbProvider.db(application)
+            db.userDao().upsert(
+                com.recuperavc.models.User(
+                    id = CurrentUser.ID,
+                    login = "demo",
+                    password = "demo",
+                    email = "demo@example.com",
+                    wordsPerMinute = 0f,
+                    wordErrorRate = 0f,
+                    name = "Usuário Demo"
+                )
+            )
+            val patternId = UUID.nameUUIDFromBytes(phraseText.lowercase().toByteArray())
+            db.patternAudioPhraseDao().upsert(PatternAudioPhrase(id = patternId, description = phraseText))
+            db.patternCoherencePhraseDao().upsert(PatternCoherencePhrase(id = patternId, description = phraseText))
+            val audioId = UUID.randomUUID()
+            val audio = AudioFile(
+                id = audioId,
+                path = file.absolutePath,
+                fileType = "wav",
+                fileName = file.name,
+                isPattern = false,
+                audioDuration = recordingDurationMs.toInt(),
+                recordedAt = Instant.now(),
+                userId = CurrentUser.ID,
+                patternAudioPhraseId = patternId
+            )
+            db.audioFileDao().upsert(audio)
+            val warn = analysis.wer > 30.0 || analysis.wpm < 40
+            val reportId = UUID.randomUUID()
+            val report = AudioReport(
+                id = reportId,
+                hasWarning = warn,
+                description = "wpm=${analysis.wpm};wer=${String.format("%.1f", analysis.wer)};text=$transcribedText",
+                userId = CurrentUser.ID,
+                mainAudioFileId = audioId
+            )
+            db.audioReportDao().upsert(report)
+            db.audioReportDao().link(AudioReportGroup(idAudioReport = reportId, idAudioFile = audioId))
+            val coherenceId = UUID.randomUUID()
+            val coherence = CoherenceReport(
+                id = coherenceId,
+                hasWarning = warn,
+                description = "score=${String.format("%.1f", 100 - analysis.wer)};expected=$phraseText;transcribed=$transcribedText",
+                score = (100 - analysis.wer).toFloat(),
+                mainPatternId = patternId,
+                userId = CurrentUser.ID
+            )
+            db.coherenceReportDao().upsert(coherence)
+            db.coherenceReportDao().link(CoherenceReportGroup(idCoherenceReport = coherenceId, idPatternCoherenceReport = patternId))
+        }
     }
 
     fun clearResults() {
@@ -215,7 +285,13 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     }
 
     private suspend fun getTempFileForRecording() = withContext(Dispatchers.IO) {
-        File.createTempFile("recording", "wav")
+        recordingsPath.mkdirs()
+        val raw = phraseText.lowercase()
+        val safe = raw.replace("[^a-z0-9]+".toRegex(), "_").trim('_')
+        val short = if (safe.length > 16) safe.substring(0, 16) else safe
+        val fmt = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
+        val ts = java.time.LocalDateTime.now().format(fmt)
+        File(recordingsPath, "rec_${ts}_${short}.wav")
     }
     
     private fun boostProcessPriority() {
