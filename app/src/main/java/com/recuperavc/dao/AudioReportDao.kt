@@ -15,4 +15,7 @@ interface AudioReportDao {
     @Transaction
     @Query("SELECT * FROM AudioReport WHERE id = :reportId")
     fun observeWithFiles(reportId: UUID): Flow<AudioReportWithFiles?>
+
+    @Query("SELECT * FROM AudioReport WHERE fk_User_id = :userId")
+    fun observeForUser(userId: Int): Flow<List<AudioReport>>
 }
