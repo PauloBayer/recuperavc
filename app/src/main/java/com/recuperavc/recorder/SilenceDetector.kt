@@ -5,7 +5,7 @@ import kotlin.math.sqrt
 
 class SilenceDetector(
     private val silenceThreshold: Double = 0.02,
-    private val silenceDurationMs: Long = 2000,
+    private val silenceDurationMs: Long = 5000,
     private val minRecordingDurationMs: Long = 800
 ) {
     private var silenceStartTime: Long = 0

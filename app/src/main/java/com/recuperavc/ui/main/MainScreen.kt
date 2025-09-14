@@ -2,16 +2,15 @@ package com.recuperavc.ui.main
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Cancel
@@ -25,7 +24,7 @@ import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.animation.core.LinearEasing
+ 
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -77,12 +76,18 @@ private fun MainScreenContent(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.radialGradient(
-                    colors = listOf(GreenLight, GreenPrimary, BackgroundGreen),
-                    radius = 1200f
-                )
-            )
+            .let { base ->
+                if (isLoading || isProcessing) {
+                    base.background(BackgroundGreen)
+                } else {
+                    base.background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(GreenLight, GreenPrimary, BackgroundGreen),
+                            radius = 1200f
+                        )
+                    )
+                }
+            }
     ) {
         IconButton(
             onClick = { },
@@ -186,6 +191,36 @@ private fun MainScreenContent(
 
         }
         
+        if (isProcessing) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.35f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(64.dp),
+                        color = OnBackground,
+                        strokeWidth = 6.dp
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Analisando sua gravação...",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = OnBackground,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+
         if ((transcriptionResult.isNotEmpty() || analysisResult != null) && !isProcessing) {
             Box(
                 modifier = Modifier
@@ -276,16 +311,6 @@ private fun RecordingCircles(
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse_scale"
-    )
-    
-    val loadingRotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "loading_rotation"
     )
 
     Box(
@@ -382,28 +407,6 @@ private fun RecordingCircles(
             contentAlignment = Alignment.Center
         ) {
             when {
-                isProcessing -> {
-                    Box(
-                        modifier = Modifier.size(48.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(40.dp),
-                            color = OnSurface,
-                            strokeWidth = 4.dp
-                        )
-                        Icon(
-                            imageVector = Icons.Default.Mic,
-                            contentDescription = "Processando",
-                            tint = OnSurface.copy(alpha = 0.6f),
-                            modifier = Modifier
-                                .size(24.dp)
-                                .graphicsLayer {
-                                    rotationZ = loadingRotation
-                                }
-                        )
-                    }
-                }
                 isRecording -> {
                     Icon(
                         imageVector = Icons.Default.Mic,
