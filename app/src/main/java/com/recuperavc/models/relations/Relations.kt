@@ -8,7 +8,7 @@ import com.recuperavc.models.AudioReport
 import com.recuperavc.models.AudioReportGroup
 import com.recuperavc.models.CoherenceReport
 import com.recuperavc.models.CoherenceReportGroup
-import com.recuperavc.models.MotorReport
+import com.recuperavc.models.MotionReport
 import com.recuperavc.models.Phrase
 import com.recuperavc.models.User
 
@@ -49,11 +49,11 @@ data class CoherenceReportWithPhrases(
     val phrases: List<Phrase>
 )
 
-data class UserWithMotorReports(
+data class UserWithMotionReports(
     @Embedded val user: User,
     @Relation(
         parentColumn = "id",
         entityColumn = "fk_user_id"
     )
-    val motorReports: List<MotorReport>
+    val MotionReports: List<MotionReport>
 )

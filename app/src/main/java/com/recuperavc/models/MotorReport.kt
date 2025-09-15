@@ -10,7 +10,7 @@ import java.time.Instant
 import java.util.UUID
 
 @Entity(
-    tableName = "MotorReport",
+    tableName = "MotionReport",
     foreignKeys = [ForeignKey(
         entity = User::class,
         parentColumns = ["id"],
@@ -20,7 +20,7 @@ import java.util.UUID
     )],
     indices = [Index("fk_user_id")]
 )
-data class MotorReport(
+data class MotionReport(
     @PrimaryKey val id: UUID = UUID.randomUUID(),
     val date: Instant,
     val secondsTotal: Float,

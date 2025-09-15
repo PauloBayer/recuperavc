@@ -17,9 +17,9 @@ import com.recuperavc.dao.UserDao
 import com.recuperavc.dao.AudioFileDao
 import com.recuperavc.dao.AudioReportDao
 import com.recuperavc.dao.CoherenceReportDao
-import com.recuperavc.dao.MotorReportDao
+import com.recuperavc.dao.MotionReportDao
 import com.recuperavc.dao.PhraseDao
-import com.recuperavc.models.MotorReport
+import com.recuperavc.models.MotionReport
 import com.recuperavc.models.Phrase
 
 @Database(
@@ -28,7 +28,7 @@ import com.recuperavc.models.Phrase
         AudioReport::class, AudioReportGroup::class,
         Phrase::class,
         CoherenceReport::class, CoherenceReportGroup::class,
-        MotorReport::class
+        MotionReport::class
     ],
     version = 1,
     exportSchema = true
@@ -39,7 +39,7 @@ abstract class AppRoomDatabase : RoomDatabase() {
     abstract fun audioFileDao(): AudioFileDao
     abstract fun audioReportDao(): AudioReportDao
     abstract fun coherenceReportDao(): CoherenceReportDao
-    abstract fun motorReportDao(): MotorReportDao
+    abstract fun MotionReportDao(): MotionReportDao
     abstract fun phraseDao(): PhraseDao
 
     companion object {
