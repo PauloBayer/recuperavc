@@ -1,30 +1,18 @@
 package com.recuperavc.dao
 
 import androidx.room.*
-import com.recuperavc.models.PatternAudioPhrase
-import com.recuperavc.models.PatternCoherencePhrase
+import androidx.room.OnConflictStrategy.Companion.REPLACE
+import com.recuperavc.models.Phrase
 import java.util.UUID
 
 @Dao
-interface PatternAudioPhraseDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(item: PatternAudioPhrase)
+interface PhraseDao {
+    @Insert(onConflict = REPLACE)
+    suspend fun upsert(item: Phrase)
 
-    @Query("SELECT * FROM PatternAudioPhrase")
-    suspend fun getAll(): List<PatternAudioPhrase>
+    @Query("SELECT * FROM Phrase")
+    suspend fun getAll(): List<Phrase>
 
-    @Query("SELECT * FROM PatternAudioPhrase WHERE id = :id")
-    suspend fun getById(id: UUID): PatternAudioPhrase?
-}
-
-@Dao
-interface PatternCoherencePhraseDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(item: PatternCoherencePhrase)
-
-    @Query("SELECT * FROM PatternCoherencePhrase")
-    suspend fun getAll(): List<PatternCoherencePhrase>
-
-    @Query("SELECT * FROM PatternCoherencePhrase WHERE id = :id")
-    suspend fun getById(id: UUID): PatternCoherencePhrase?
+    @Query("SELECT * FROM Phrase WHERE id = :id")
+    suspend fun getById(id: UUID): Phrase?
 }

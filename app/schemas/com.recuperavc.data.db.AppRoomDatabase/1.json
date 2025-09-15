@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "d0659d44a8d638d2176026e61e4d8754",
+    "identityHash": "160ec7182f737d6db70ee8d83feeff71",
     "entities": [
       {
         "tableName": "User",
@@ -61,34 +61,8 @@
         "foreignKeys": []
       },
       {
-        "tableName": "PatternAudioPhrase",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `description` TEXT NOT NULL, PRIMARY KEY(`id`))",
-        "fields": [
-          {
-            "fieldPath": "id",
-            "columnName": "id",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "description",
-            "columnName": "description",
-            "affinity": "TEXT",
-            "notNull": true
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": false,
-          "columnNames": [
-            "id"
-          ]
-        },
-        "indices": [],
-        "foreignKeys": []
-      },
-      {
         "tableName": "AudioFile",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `path` TEXT NOT NULL, `fileType` TEXT NOT NULL, `fileName` TEXT NOT NULL, `isPattern` INTEGER NOT NULL, `audioDuration` INTEGER NOT NULL, `recordedAt` INTEGER NOT NULL, `fk_User_id` INTEGER NOT NULL, `fk_PatternAudioPhrase_id` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`fk_User_id`) REFERENCES `User`(`id`) ON UPDATE CASCADE ON DELETE CASCADE , FOREIGN KEY(`fk_PatternAudioPhrase_id`) REFERENCES `PatternAudioPhrase`(`id`) ON UPDATE CASCADE ON DELETE SET NULL )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `path` TEXT NOT NULL, `fileType` TEXT NOT NULL, `fileName` TEXT NOT NULL, `isPattern` INTEGER NOT NULL, `audioDuration` INTEGER NOT NULL, `recordedAt` INTEGER NOT NULL, `fk_User_id` INTEGER NOT NULL, `fk_Phrase_id` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`fk_User_id`) REFERENCES `User`(`id`) ON UPDATE CASCADE ON DELETE CASCADE , FOREIGN KEY(`fk_Phrase_id`) REFERENCES `Phrase`(`id`) ON UPDATE CASCADE ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "id",
@@ -139,8 +113,8 @@
             "notNull": true
           },
           {
-            "fieldPath": "patternAudioPhraseId",
-            "columnName": "fk_PatternAudioPhrase_id",
+            "fieldPath": "phraseId",
+            "columnName": "fk_Phrase_id",
             "affinity": "TEXT",
             "notNull": false
           }
@@ -162,13 +136,13 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_AudioFile_fk_User_id` ON `${TABLE_NAME}` (`fk_User_id`)"
           },
           {
-            "name": "index_AudioFile_fk_PatternAudioPhrase_id",
+            "name": "index_AudioFile_fk_Phrase_id",
             "unique": false,
             "columnNames": [
-              "fk_PatternAudioPhrase_id"
+              "fk_Phrase_id"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_AudioFile_fk_PatternAudioPhrase_id` ON `${TABLE_NAME}` (`fk_PatternAudioPhrase_id`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_AudioFile_fk_Phrase_id` ON `${TABLE_NAME}` (`fk_Phrase_id`)"
           }
         ],
         "foreignKeys": [
@@ -184,11 +158,11 @@
             ]
           },
           {
-            "table": "PatternAudioPhrase",
+            "table": "Phrase",
             "onDelete": "SET NULL",
             "onUpdate": "CASCADE",
             "columns": [
-              "fk_PatternAudioPhrase_id"
+              "fk_Phrase_id"
             ],
             "referencedColumns": [
               "id"
@@ -352,7 +326,7 @@
         ]
       },
       {
-        "tableName": "PatternCoherencePhrase",
+        "tableName": "Phrase",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `description` TEXT NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
@@ -379,7 +353,7 @@
       },
       {
         "tableName": "CoherenceReport",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `hasWarning` INTEGER NOT NULL, `description` TEXT NOT NULL, `score` REAL NOT NULL, `fk_PatternCoherencePhrase_id` TEXT, `fk_User_id` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`fk_User_id`) REFERENCES `User`(`id`) ON UPDATE CASCADE ON DELETE CASCADE , FOREIGN KEY(`fk_PatternCoherencePhrase_id`) REFERENCES `PatternCoherencePhrase`(`id`) ON UPDATE CASCADE ON DELETE SET NULL )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `hasWarning` INTEGER NOT NULL, `description` TEXT NOT NULL, `score` REAL NOT NULL, `fk_Phrase_id` TEXT, `fk_User_id` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`fk_User_id`) REFERENCES `User`(`id`) ON UPDATE CASCADE ON DELETE CASCADE , FOREIGN KEY(`fk_Phrase_id`) REFERENCES `Phrase`(`id`) ON UPDATE CASCADE ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "id",
@@ -406,8 +380,8 @@
             "notNull": true
           },
           {
-            "fieldPath": "mainPatternId",
-            "columnName": "fk_PatternCoherencePhrase_id",
+            "fieldPath": "phraseId",
+            "columnName": "fk_Phrase_id",
             "affinity": "TEXT",
             "notNull": false
           },
@@ -435,13 +409,13 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_CoherenceReport_fk_User_id` ON `${TABLE_NAME}` (`fk_User_id`)"
           },
           {
-            "name": "index_CoherenceReport_fk_PatternCoherencePhrase_id",
+            "name": "index_CoherenceReport_fk_Phrase_id",
             "unique": false,
             "columnNames": [
-              "fk_PatternCoherencePhrase_id"
+              "fk_Phrase_id"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_CoherenceReport_fk_PatternCoherencePhrase_id` ON `${TABLE_NAME}` (`fk_PatternCoherencePhrase_id`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_CoherenceReport_fk_Phrase_id` ON `${TABLE_NAME}` (`fk_Phrase_id`)"
           }
         ],
         "foreignKeys": [
@@ -457,11 +431,11 @@
             ]
           },
           {
-            "table": "PatternCoherencePhrase",
+            "table": "Phrase",
             "onDelete": "SET NULL",
             "onUpdate": "CASCADE",
             "columns": [
-              "fk_PatternCoherencePhrase_id"
+              "fk_Phrase_id"
             ],
             "referencedColumns": [
               "id"
@@ -471,7 +445,7 @@
       },
       {
         "tableName": "CoherenceReportGroup",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`idCoherenceReport` TEXT NOT NULL, `idPatternCoherenceReport` TEXT NOT NULL, PRIMARY KEY(`idCoherenceReport`, `idPatternCoherenceReport`), FOREIGN KEY(`idCoherenceReport`) REFERENCES `CoherenceReport`(`id`) ON UPDATE CASCADE ON DELETE CASCADE , FOREIGN KEY(`idPatternCoherenceReport`) REFERENCES `PatternCoherencePhrase`(`id`) ON UPDATE CASCADE ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`idCoherenceReport` TEXT NOT NULL, `idPhrase` TEXT NOT NULL, PRIMARY KEY(`idCoherenceReport`, `idPhrase`), FOREIGN KEY(`idCoherenceReport`) REFERENCES `CoherenceReport`(`id`) ON UPDATE CASCADE ON DELETE CASCADE , FOREIGN KEY(`idPhrase`) REFERENCES `Phrase`(`id`) ON UPDATE CASCADE ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "idCoherenceReport",
@@ -480,8 +454,8 @@
             "notNull": true
           },
           {
-            "fieldPath": "idPatternCoherenceReport",
-            "columnName": "idPatternCoherenceReport",
+            "fieldPath": "idPhrase",
+            "columnName": "idPhrase",
             "affinity": "TEXT",
             "notNull": true
           }
@@ -490,7 +464,7 @@
           "autoGenerate": false,
           "columnNames": [
             "idCoherenceReport",
-            "idPatternCoherenceReport"
+            "idPhrase"
           ]
         },
         "indices": [
@@ -504,13 +478,13 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_CoherenceReportGroup_idCoherenceReport` ON `${TABLE_NAME}` (`idCoherenceReport`)"
           },
           {
-            "name": "index_CoherenceReportGroup_idPatternCoherenceReport",
+            "name": "index_CoherenceReportGroup_idPhrase",
             "unique": false,
             "columnNames": [
-              "idPatternCoherenceReport"
+              "idPhrase"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_CoherenceReportGroup_idPatternCoherenceReport` ON `${TABLE_NAME}` (`idPatternCoherenceReport`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_CoherenceReportGroup_idPhrase` ON `${TABLE_NAME}` (`idPhrase`)"
           }
         ],
         "foreignKeys": [
@@ -526,11 +500,83 @@
             ]
           },
           {
-            "table": "PatternCoherencePhrase",
+            "table": "Phrase",
             "onDelete": "CASCADE",
             "onUpdate": "CASCADE",
             "columns": [
-              "idPatternCoherenceReport"
+              "idPhrase"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "MotorReport",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `date` INTEGER NOT NULL, `secondsTotal` REAL NOT NULL, `clicksPerMinute` INTEGER NOT NULL, `totalClicks` INTEGER NOT NULL, `fk_user_id` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`fk_user_id`) REFERENCES `User`(`id`) ON UPDATE CASCADE ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "secondsTotal",
+            "columnName": "secondsTotal",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "clicksPerMinute",
+            "columnName": "clicksPerMinute",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalClicks",
+            "columnName": "totalClicks",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userId",
+            "columnName": "fk_user_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_MotorReport_fk_user_id",
+            "unique": false,
+            "columnNames": [
+              "fk_user_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_MotorReport_fk_user_id` ON `${TABLE_NAME}` (`fk_user_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "User",
+            "onDelete": "CASCADE",
+            "onUpdate": "CASCADE",
+            "columns": [
+              "fk_user_id"
             ],
             "referencedColumns": [
               "id"
@@ -542,7 +588,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd0659d44a8d638d2176026e61e4d8754')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '160ec7182f737d6db70ee8d83feeff71')"
     ]
   }
 }

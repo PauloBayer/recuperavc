@@ -6,11 +6,9 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.recuperavc.models.User
-import com.recuperavc.models.PatternAudioPhrase
 import com.recuperavc.models.AudioFile
 import com.recuperavc.models.AudioReport
 import com.recuperavc.models.AudioReportGroup
-import com.recuperavc.models.PatternCoherencePhrase
 import com.recuperavc.models.CoherenceReport
 import com.recuperavc.models.CoherenceReportGroup
 import com.recuperavc.models.db.Converters
@@ -19,15 +17,18 @@ import com.recuperavc.dao.UserDao
 import com.recuperavc.dao.AudioFileDao
 import com.recuperavc.dao.AudioReportDao
 import com.recuperavc.dao.CoherenceReportDao
-import com.recuperavc.dao.PatternAudioPhraseDao
-import com.recuperavc.dao.PatternCoherencePhraseDao
+import com.recuperavc.dao.MotorReportDao
+import com.recuperavc.dao.PhraseDao
+import com.recuperavc.models.MotorReport
+import com.recuperavc.models.Phrase
 
 @Database(
     entities = [
-        User::class,
-        PatternAudioPhrase::class, AudioFile::class,
+        User::class, AudioFile::class,
         AudioReport::class, AudioReportGroup::class,
-        PatternCoherencePhrase::class, CoherenceReport::class, CoherenceReportGroup::class
+        Phrase::class,
+        CoherenceReport::class, CoherenceReportGroup::class,
+        MotorReport::class
     ],
     version = 1,
     exportSchema = true
@@ -38,8 +39,8 @@ abstract class AppRoomDatabase : RoomDatabase() {
     abstract fun audioFileDao(): AudioFileDao
     abstract fun audioReportDao(): AudioReportDao
     abstract fun coherenceReportDao(): CoherenceReportDao
-    abstract fun patternAudioPhraseDao(): PatternAudioPhraseDao
-    abstract fun patternCoherencePhraseDao(): PatternCoherencePhraseDao
+    abstract fun motorReportDao(): MotorReportDao
+    abstract fun phraseDao(): PhraseDao
 
     companion object {
         @Volatile private var INSTANCE: AppRoomDatabase? = null
