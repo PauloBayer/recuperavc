@@ -3,27 +3,87 @@ package com.recuperavc.library
 object PhraseLibrary {
 
     private val shortPhrases = listOf(
-        "O rato roeu a roupa do rei de roma.",
-        "O sucesso vem com a persistência.",
-        "Sonhar é o primeiro passo.",
-        "Coragem é agir com medo mesmo assim.",
-        "Simplicidade é a chave da felicidade."
+        "O rato roeu a roupa do rei de Roma.",
+        "O sucesso nasce da prática feita com foco diário.",
+        "Sonhar abre caminho para um plano claro.",
+        "Coragem é avançar mesmo com medo no presente.",
+        "A simplicidade guia a escolha correta no trabalho.",
+        "O aluno escreve uma página por dia com atenção.",
+        "A equipe define uma meta em quadro visível.",
+        "O treino começa sempre no horário da manhã.",
+        "A voz melhora com leitura em voz alta.",
+        "O estudante revisa o resumo depois do estudo breve.",
+        "A terapeuta registra o progresso em folha simples.",
+        "O paciente repete a frase completa três vezes.",
+        "O aplicativo mostra a tarefa ativa na tela.",
+        "O treinador indica um passo claro para hoje.",
+        "A mente foca na tarefa única por trinta minutos.",
+        "O professor corrige o texto com retorno rápido.",
+        "O grupo inicia a reunião no horário combinado.",
+        "A agenda reserva um bloco fixo para leitura.",
+        "O desenhista anota ideias em um cartão pequeno.",
+        "A pesquisa começa após um café curto.",
+        "O aluno pratica a dicção com uma gravação curta.",
+        "O time registra erros no quadro de acompanhamento.",
+        "A escrita flui melhor com um esboço simples.",
+        "O objetivo guia escolhas durante a semana inteira.",
+        "O leitor marca a página com um marcador discreto."
     )
 
     private val middlePhrases = listOf(
-        "A jornada de mil milhas começa com um único passo.",
-        "Grandes conquistas começam com pequenas atitudes.",
-        "Acredite em você e tudo será possível.",
-        "A disciplina é a ponte entre metas e realizações.",
-        "O que você planta hoje, colherá amanhã."
+        "A jornada começa agora com um passo firme.",
+        "Pequenos hábitos constroem um resultado estável.",
+        "Acredite em si para entregar uma tarefa por vez.",
+        "A disciplina mantém a meta perto da ação.",
+        "Plante hoje para colher amanhã com tranquilidade.",
+        "O foco separa a tarefa principal da fila.",
+        "Comece pequeno para sustentar o progresso diário.",
+        "Registrar métricas orienta a próxima decisão com clareza.",
+        "Revisar o plano remove ruído da execução.",
+        "Um ritual simples prepara a mente para o trabalho.",
+        "Respire fundo para iniciar o passo seguinte.",
+        "Proteja a manhã para fazer o essencial primeiro.",
+        "Limite distrações para manter a atenção no alvo.",
+        "Dê um nome claro à sua meta.",
+        "Prepare o ambiente para reduzir atritos.",
+        "Revise prioridades antes de abrir mensagens.",
+        "Quebre o projeto em partes menores.",
+        "Entregue uma versão funcional antes do polimento.",
+        "Aprender pede prática regular com correções honestas.",
+        "Use um cronômetro para sustentar seu tempo de foco.",
+        "Faça pausas breves para renovar a energia.",
+        "Bloqueie o celular para evitar interrupções.",
+        "Feche abas sem uso antes de abrir uma nova.",
+        "Defina um término claro para a tarefa atual.",
+        "Avalie o dia para ajustar o plano amanhã."
     )
 
     private val longPhrases = listOf(
-        "Não importa a velocidade com que você caminha, desde que não pare de seguir em frente.",
-        "A vida é como andar de bicicleta: para manter o equilíbrio, você precisa se manter em movimento.",
-        "O sucesso não é definitivo e o fracasso não é fatal: o que conta é a coragem de continuar.",
-        "Cada dia é uma nova oportunidade para aprender, crescer e se tornar melhor.",
-        "Grandes mudanças acontecem quando pequenas atitudes se repetem todos os dias."
+        "O progresso chega em silêncio com a repetição de um bom passo diário.",
+        "A confiança cresce com cada entrega completa sob revisão simples.",
+        "A mente foca melhor após um início calmo com um ambiente organizado.",
+        "O plano funciona melhor com limite claro de tempo para cada tarefa.",
+        "A paciência sustenta a execução em dias longos sem depender de motivação instável.",
+        "A energia retorna com pausa breve e água por perto durante o trabalho.",
+        "A meta ganha tração com medidas simples ao final de cada sessão.",
+        "O erro vira lição com registro imediato em um caderno dedicado.",
+        "O corpo rende mais com sono adequado durante toda a semana.",
+        "O objetivo fica visível com um quadro na mesa em posição central.",
+        "A mente evita atalhos com passos explícitos dentro de um checklist simples.",
+        "O aprendizado acelera com revisão curta logo após a prática do dia.",
+        "O projeto avança com escopo delimitado no calendário.",
+        "A rotina facilita a ação com horário fixo para iniciar a tarefa.",
+        "O dia rende mais com uma lista curta ao lado do teclado.",
+        "A atenção melhora com silêncio controlado no ambiente de trabalho.",
+        "A mente trabalha melhor com metas visíveis perto do local de estudo.",
+        "O caminho fica seguro com passos constantes ao redor do mesmo objetivo.",
+        "O hábito se firma com repetição diária após o despertar do corpo.",
+        "O resultado aparece com prática constante sob um método simples.",
+        "O foco melhora com fone fechado durante tarefas que pedem atenção.",
+        "A escrita flui melhor com um esboço direto antes do texto final.",
+        "A leitura rende mais com marcação leve ao final de cada seção.",
+        "A fala sai clara com treino curto diante do espelho.",
+        "A decisão fica fácil com critérios fixos na abertura de cada projeto."
     )
 
     fun getFrase(tamanho: String = "curta"): String {
@@ -31,7 +91,7 @@ object PhraseLibrary {
             "curta" -> shortPhrases.random()
             "media" -> middlePhrases.random()
             "longa" -> longPhrases.random()
-            else -> shortPhrases.random()
+            else -> middlePhrases.random()
         }
     }
     
