@@ -96,7 +96,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     }
     fun loadNewPhrase() {
         viewModelScope.launch {
-            phraseText = phraseManager.getNextPhrase("curta")
+            phraseText = phraseManager.getNextPhrase("media")
         }
     }
 

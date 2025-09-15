@@ -62,7 +62,11 @@ import com.recuperavc.ui.theme.GreenLight
 import com.recuperavc.ui.theme.OnBackground
 
 @Composable
-fun HomeScreen(onOpenAudioTest: () -> Unit, onExit: () -> Unit) {
+fun HomeScreen(
+    onOpenSentenceTest: () -> Unit = {},
+    onOpenAudioTest: () -> Unit,
+    onExit: () -> Unit
+) {
     val drawerState: DrawerState = rememberDrawerState(DrawerValue.Closed)
     var showReports by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -82,8 +86,16 @@ fun HomeScreen(onOpenAudioTest: () -> Unit, onExit: () -> Unit) {
                         val path = Path().apply {
                             moveTo(0f, 0f)
                             lineTo(0f, h * 0.55f)
-                            cubicTo(w * 0.25f, h * 0.20f, w * 0.55f, h * 0.95f, w * 0.80f, h * 0.60f)
-                            cubicTo(w * 0.90f, h * 0.40f, w, h * 0.48f, w, h * 0.38f)
+                            cubicTo(
+                                w * 0.25f, h * 0.20f,
+                                w * 0.55f, h * 0.95f,
+                                w * 0.80f, h * 0.60f
+                            )
+                            cubicTo(
+                                w * 0.90f, h * 0.40f,
+                                w, h * 0.48f,
+                                w, h * 0.38f
+                            )
                             lineTo(w, 0f)
                             close()
                         }
@@ -94,9 +106,7 @@ fun HomeScreen(onOpenAudioTest: () -> Unit, onExit: () -> Unit) {
                 NavigationDrawerItem(
                     label = { Text("Relatórios") },
                     selected = false,
-                    onClick = {
-                        showReports = true
-                    },
+                    onClick = { showReports = true },
                     icon = { Icon(Icons.Default.Summarize, contentDescription = null) },
                     colors = NavigationDrawerItemDefaults.colors(
                         selectedContainerColor = Color.White.copy(alpha = 0.16f),
@@ -146,15 +156,25 @@ fun HomeScreen(onOpenAudioTest: () -> Unit, onExit: () -> Unit) {
                     val path = Path().apply {
                         moveTo(0f, 0f)
                         lineTo(0f, h * 0.55f)
-                        cubicTo(w * 0.25f, h * 0.25f, w * 0.45f, h * 0.95f, w * 0.6f, h * 0.65f)
-                        cubicTo(w * 0.8f, h * 0.35f, w * 0.9f, h * 0.5f, w, h * 0.4f)
+                        cubicTo(
+                            w * 0.25f, h * 0.25f,
+                            w * 0.45f, h * 0.95f,
+                            w * 0.6f, h * 0.65f
+                        )
+                        cubicTo(
+                            w * 0.8f, h * 0.35f,
+                            w * 0.9f, h * 0.5f,
+                            w, h * 0.4f
+                        )
                         lineTo(w, 0f)
                         close()
                     }
                     drawPath(path, color = GreenLight)
                 }
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Top
                 ) {
@@ -168,14 +188,16 @@ fun HomeScreen(onOpenAudioTest: () -> Unit, onExit: () -> Unit) {
             }
 
             Column(
-                modifier = Modifier.fillMaxSize().padding(top = 140.dp, start = 16.dp, end = 16.dp, bottom = 16.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 140.dp, start = 16.dp, end = 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.Top,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 ActionCard(
                     title = "Teste de raciocínio",
                     icon = Icons.Default.Psychology,
-                    onClick = {}
+                    onClick = onOpenSentenceTest
                 )
                 Spacer(Modifier.height(16.dp))
                 ActionCard(
@@ -199,19 +221,31 @@ fun HomeScreen(onOpenAudioTest: () -> Unit, onExit: () -> Unit) {
 }
 
 @Composable
-private fun ActionCard(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+private fun ActionCard(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
     Card(
-        modifier = Modifier.fillMaxWidth().height(96.dp).clickable { onClick() },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(96.dp)
+            .clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = GreenLight.copy(alpha = 0.9f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)).background(GreenDark),
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(GreenDark),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))

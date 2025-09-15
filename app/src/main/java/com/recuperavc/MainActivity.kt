@@ -11,9 +11,10 @@ import androidx.compose.runtime.setValue
 import com.recuperavc.ui.home.HomeScreen
 import com.recuperavc.ui.main.AudioAnalysisScreen
 import com.recuperavc.ui.main.MainScreenViewModel
+import com.recuperavc.ui.main.SentenceArrangeScreen
 import com.recuperavc.ui.theme.WhisperCppDemoTheme
 
-enum class AppRoute { Home, AudioAnalysis }
+enum class AppRoute { Home, AudioAnalysis, SentenceArrange }
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainScreenViewModel by viewModels { MainScreenViewModel.factory() }
@@ -25,12 +26,18 @@ class MainActivity : ComponentActivity() {
                 var route by remember { mutableStateOf(AppRoute.Home) }
                 when (route) {
                     AppRoute.Home -> HomeScreen(
+                        onOpenSentenceTest = { route = AppRoute.SentenceArrange },
                         onOpenAudioTest = { route = AppRoute.AudioAnalysis },
                         onExit = { finishAffinity() }
                     )
                     AppRoute.AudioAnalysis -> AudioAnalysisScreen(
                         viewModel = viewModel,
                         onBack = { route = AppRoute.Home }
+                    )
+                    AppRoute.SentenceArrange -> SentenceArrangeScreen(
+                        phrase = "O rato roeu a roupa do rei de Roma",
+                        onResult = { },
+                        onBack = { route = AppRoute.Home } // <-- wire the X/back here
                     )
                 }
             }
