@@ -25,13 +25,12 @@ import com.recuperavc.library.PhraseLibrary
 import com.recuperavc.library.PhraseManager
 import com.recuperavc.data.db.DbProvider
 import com.recuperavc.data.CurrentUser
-import com.recuperavc.models.PatternAudioPhrase
-import com.recuperavc.models.PatternCoherencePhrase
 import com.recuperavc.models.AudioFile
 import com.recuperavc.models.AudioReport
 import com.recuperavc.models.AudioReportGroup
 import com.recuperavc.models.CoherenceReport
 import com.recuperavc.models.CoherenceReportGroup
+import com.recuperavc.models.Phrase
 import java.time.Instant
 import java.util.UUID
 
@@ -188,8 +187,8 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                 )
             )
             val patternId = UUID.nameUUIDFromBytes(phraseText.lowercase().toByteArray())
-            db.patternAudioPhraseDao().upsert(PatternAudioPhrase(id = patternId, description = phraseText))
-            db.patternCoherencePhraseDao().upsert(PatternCoherencePhrase(id = patternId, description = phraseText))
+            db.phraseDao().upsert(Phrase(id = patternId, description = phraseText))
+            db.phraseDao().upsert(Phrase(id = patternId, description = phraseText))
             val audioId = UUID.randomUUID()
             val audio = AudioFile(
                 id = audioId,
@@ -200,7 +199,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                 audioDuration = recordingDurationMs.toInt(),
                 recordedAt = Instant.now(),
                 userId = CurrentUser.ID,
-                patternAudioPhraseId = patternId
+                phraseId = patternId
             )
             db.audioFileDao().upsert(audio)
             val warn = analysis.wer > 30.0 || analysis.wpm < 40
@@ -220,11 +219,11 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                 hasWarning = warn,
                 description = "score=${String.format("%.1f", 100 - analysis.wer)};expected=$phraseText;transcribed=$transcribedText",
                 score = (100 - analysis.wer).toFloat(),
-                mainPatternId = patternId,
+                phraseId = patternId,
                 userId = CurrentUser.ID
             )
             db.coherenceReportDao().upsert(coherence)
-            db.coherenceReportDao().link(CoherenceReportGroup(idCoherenceReport = coherenceId, idPatternCoherenceReport = patternId))
+            db.coherenceReportDao().link(CoherenceReportGroup(idCoherenceReport = coherenceId, idPhrase = patternId))
         }
     }
 

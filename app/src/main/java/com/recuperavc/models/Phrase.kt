@@ -4,8 +4,8 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import java.util.UUID
 
-@Entity(tableName = "PatternCoherencePhrase")
-data class PatternCoherencePhrase(
+@Entity(tableName = "Phrase")
+data class Phrase(
     @PrimaryKey val id: UUID = UUID.randomUUID(),
     val description: String
 )
