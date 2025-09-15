@@ -37,7 +37,7 @@ class MainActivity : ComponentActivity() {
                     AppRoute.SentenceArrange -> SentenceArrangeScreen(
                         phrase = "O rato roeu a roupa do rei de Roma",
                         onResult = { },
-                        onBack = { route = AppRoute.Home } // <-- wire the X/back here
+                        onBack = { route = AppRoute.Home }
                     )
                 }
             }
