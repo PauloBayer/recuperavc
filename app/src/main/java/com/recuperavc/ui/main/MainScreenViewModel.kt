@@ -172,7 +172,12 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         canTranscribe = true
     }
 
-    private suspend fun persistResults(file: File, recordingDurationMs: Long, transcribedText: String, analysis: AnalysisResult) {
+    private suspend fun persistResults(
+        file: File,
+        recordingDurationMs: Long,
+        transcribedText: String,
+        analysis: AnalysisResult
+    ) {
         withContext(Dispatchers.IO) {
             val db = DbProvider.db(application)
             db.userDao().upsert(
@@ -186,44 +191,64 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                     name = "Usuário Demo"
                 )
             )
-            val patternId = UUID.nameUUIDFromBytes(phraseText.lowercase().toByteArray())
-            db.phraseDao().upsert(Phrase(id = patternId, description = phraseText))
-            db.phraseDao().upsert(Phrase(id = patternId, description = phraseText))
+
+            // look up the existing phrase (inserted at app startup)
+            val existingPhrase =
+                db.phraseDao().getAll().firstOrNull { it.description == phraseText }
+            val patternId: UUID = existingPhrase?.id
+                ?: UUID.nameUUIDFromBytes(phraseText.lowercase().toByteArray())
+
+            // create and upsert audio file
             val audioId = UUID.randomUUID()
             val audio = AudioFile(
                 id = audioId,
                 path = file.absolutePath,
                 fileType = "wav",
                 fileName = file.name,
-                isPattern = false,
                 audioDuration = recordingDurationMs.toInt(),
                 recordedAt = Instant.now(),
                 userId = CurrentUser.ID,
                 phraseId = patternId
             )
             db.audioFileDao().upsert(audio)
-            val warn = analysis.wer > 30.0 || analysis.wpm < 40
+
+            // create and upsert audio report
             val reportId = UUID.randomUUID()
             val report = AudioReport(
                 id = reportId,
-                hasWarning = warn,
-                description = "wpm=${analysis.wpm};wer=${String.format("%.1f", analysis.wer)};text=$transcribedText",
+                averageWordsPerMinute = analysis.wpm.toFloat(),
+                averageWordErrorRate = analysis.wer.toFloat(),
+                allTestsDescription =
+                    "wpm=${analysis.wpm};wer=${String.format("%.1f", analysis.wer)};text=$transcribedText",
                 userId = CurrentUser.ID,
                 mainAudioFileId = audioId
             )
             db.audioReportDao().upsert(report)
-            db.audioReportDao().link(AudioReportGroup(idAudioReport = reportId, idAudioFile = audioId))
+            db.audioReportDao().link(
+                AudioReportGroup(
+                    idAudioReport = reportId,
+                    idAudioFile = audioId
+                )
+            )
+
+            // create and upsert coherence report
             val coherenceId = UUID.randomUUID()
             val coherence = CoherenceReport(
                 id = coherenceId,
-                hasWarning = warn,
-                description = "score=${String.format("%.1f", 100 - analysis.wer)};expected=$phraseText;transcribed=$transcribedText",
-                score = (100 - analysis.wer).toFloat(),
+                averageErrorsPerTry = analysis.wer.toFloat(),
+                averageTimePerTry = recordingDurationMs / 1000.0f,
+                allTestsDescription =
+                    "score=${String.format("%.1f", 100 - analysis.wer)};expected=$phraseText;transcribed=$transcribedText",
                 phraseId = patternId,
                 userId = CurrentUser.ID
             )
             db.coherenceReportDao().upsert(coherence)
-            db.coherenceReportDao().link(CoherenceReportGroup(idCoherenceReport = coherenceId, idPhrase = patternId))
+            db.coherenceReportDao().link(
+                CoherenceReportGroup(
+                    idPhrase = patternId,
+                    idCoherenceReport = coherenceId
+                )
+            )
         }
     }
 

@@ -53,13 +53,13 @@ fun HistoryDialog(onDismiss: () -> Unit) {
                 Text("Relatórios de Áudio (${audioReports.size})", fontWeight = FontWeight.Bold, color = OnBackground)
                 Spacer(Modifier.height(8.dp))
                 audioReports.take(10).forEach {
-                    Text("• ${it.description}", fontSize = 12.sp, color = Color.Black)
+                    Text("• ${it.allTestsDescription}", fontSize = 12.sp, color = Color.Black)
                 }
                 Spacer(Modifier.height(16.dp))
                 Text("Relatórios de Coerência (${coherenceReports.size})", fontWeight = FontWeight.Bold, color = OnBackground)
                 Spacer(Modifier.height(8.dp))
                 coherenceReports.take(10).forEach {
-                    Text("• score=${it.score} • ${it.description}", fontSize = 12.sp, color = Color.Black)
+                    Text("• score=${it.averageTimePerTry} • ${it.allTestsDescription}", fontSize = 12.sp, color = Color.Black)
                 }
             }
         },

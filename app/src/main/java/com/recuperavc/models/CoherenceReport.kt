@@ -25,9 +25,9 @@ import java.util.UUID
 )
 data class CoherenceReport(
     @PrimaryKey val id: UUID = UUID.randomUUID(),
-    val hasWarning: Boolean,
-    val description: String,
-    val score: Float,
+    val averageErrorsPerTry: Float,
+    val averageTimePerTry: Float,
+    val allTestsDescription: String,
     @ColumnInfo(name = "fk_Phrase_id") val phraseId: UUID?,
     @ColumnInfo(name = "fk_User_id") val userId: Int
 )

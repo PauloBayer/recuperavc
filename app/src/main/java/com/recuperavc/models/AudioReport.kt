@@ -25,8 +25,9 @@ import java.util.UUID
 )
 data class AudioReport(
     @PrimaryKey val id: UUID = UUID.randomUUID(),
-    val hasWarning: Boolean,
-    val description: String,
+    val averageWordsPerMinute: Float,
+    val averageWordErrorRate: Float,
+    val allTestsDescription: String,
     @ColumnInfo(name = "fk_User_id") val userId: Int,
     @ColumnInfo(name = "fk_AudioFile_id") val mainAudioFileId: UUID?
 )
