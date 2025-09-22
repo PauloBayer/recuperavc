@@ -24,13 +24,16 @@ import com.recuperavc.models.Phrase
 
 @Database(
     entities = [
-        User::class, AudioFile::class,
-        AudioReport::class, AudioReportGroup::class,
+        User::class,
+        AudioFile::class,
+        AudioReport::class,
+        AudioReportGroup::class,
         Phrase::class,
-        CoherenceReport::class, CoherenceReportGroup::class,
+        CoherenceReport::class,
+        CoherenceReportGroup::class,
         MotionReport::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -51,7 +54,7 @@ abstract class AppRoomDatabase : RoomDatabase() {
                     AppRoomDatabase::class.java,
                     "app.db"
                 )
-                    // .fallbackToDestructiveMigration() // <- só ativar isso aqui para ele limpar sozinho tudo do db se mudar o schema
+                    .fallbackToDestructiveMigration() // <- só ativar isso aqui para ele limpar sozinho tudo do db se mudar o schema
                     .build()
                     .also { INSTANCE = it }
             }
