@@ -29,7 +29,6 @@ data class AudioFile(
     val path: String,
     val fileType: String,
     val fileName: String,
-    val isPattern: Boolean,
     val audioDuration: Int,
     val recordedAt: Instant,
     @ColumnInfo(name = "fk_User_id") val userId: Int,
