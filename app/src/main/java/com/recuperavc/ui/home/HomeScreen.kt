@@ -65,6 +65,7 @@ import com.recuperavc.ui.theme.OnBackground
 fun HomeScreen(
     onOpenSentenceTest: () -> Unit = {},
     onOpenAudioTest: () -> Unit,
+    onOpenMotionTest: () -> Unit,
     onExit: () -> Unit
 ) {
     val drawerState: DrawerState = rememberDrawerState(DrawerValue.Closed)
@@ -209,7 +210,7 @@ fun HomeScreen(
                 ActionCard(
                     title = "Teste de coordenação motora",
                     icon = Icons.Default.Gesture,
-                    onClick = {}
+                    onClick = onOpenMotionTest
                 )
             }
 
