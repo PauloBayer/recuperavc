@@ -263,7 +263,7 @@ fun MotionTestScreen(
                 Spacer(Modifier.height(24.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(
-                        onClick = { chosenMode = null }, // run again
+                        onClick = { chosenMode = null },
                         colors = ButtonDefaults.buttonColors(containerColor = GreenAccent)
                     ) { Text("Novo teste", color = Color.White) }
 
@@ -295,7 +295,7 @@ private fun ReportCard(report: MotionReport) {
             Text("Duração: ${report.secondsTotal.toInt()}s", fontSize = 14.sp, color = Color.Black)
             Text("Cliques totais: ${report.totalClicks}", fontSize = 14.sp, color = Color.Black)
             Text("Cliques por minuto: ${report.clicksPerMinute}", fontSize = 14.sp, color = Color.Black)
-            Text("Cliques errados: ${report.missedClicks}", fontSize = 14.sp, color = Color.Black) // wording updated
+            Text("Cliques errados: ${report.missedClicks}", fontSize = 14.sp, color = Color.Black)
         }
     }
 }
