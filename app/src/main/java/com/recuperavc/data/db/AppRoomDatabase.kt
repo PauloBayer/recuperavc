@@ -33,7 +33,7 @@ import com.recuperavc.models.Phrase
         CoherenceReportGroup::class,
         MotionReport::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
