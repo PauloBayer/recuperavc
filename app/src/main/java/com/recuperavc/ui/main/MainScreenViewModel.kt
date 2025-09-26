@@ -21,7 +21,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
-import com.recuperavc.library.PhraseLibrary
 import com.recuperavc.library.PhraseManager
 import com.recuperavc.data.db.DbProvider
 import com.recuperavc.data.CurrentUser
@@ -31,8 +30,10 @@ import com.recuperavc.models.AudioReportGroup
 import com.recuperavc.models.CoherenceReport
 import com.recuperavc.models.CoherenceReportGroup
 import com.recuperavc.models.Phrase
+import com.recuperavc.models.enums.PhraseType
 import java.time.Instant
 import java.util.UUID
+import kotlinx.coroutines.delay
 
 private const val LOG_TAG = "MainScreenViewModel"
 
@@ -58,6 +59,25 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         private set
 
     var phraseText by mutableStateOf("")
+        private set
+
+    private var currentPhrase: Phrase? = null
+
+    var sessionCount by mutableStateOf(0)
+        private set
+    private val minAudiosRequired = 3
+    private data class SessionItem(
+        val audioId: UUID,
+        val phraseId: UUID?,
+        val phraseText: String,
+        val wpm: Int,
+        val wer: Double
+    )
+    private val sessionItems = mutableListOf<SessionItem>()
+
+    data class SessionSummaryItem(val phrase: String, val wpm: Int, val wer: Double)
+    data class SessionSummary(val avgWpm: Float, val avgWer: Float, val items: List<SessionSummaryItem>)
+    var sessionSummary by mutableStateOf<SessionSummary?>(null)
         private set
 
     private val modelsPath = File(application.filesDir, "models")
@@ -95,7 +115,14 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     }
     fun loadNewPhrase() {
         viewModelScope.launch {
-            phraseText = phraseManager.getNextPhrase("media")
+            val nextType = when (sessionCount % 3) {
+                0 -> PhraseType.SHORT
+                1 -> PhraseType.MEDIUM
+                else -> PhraseType.BIG
+            }
+            val phrase = phraseManager.getNextPhrase(nextType)
+            currentPhrase = phrase
+            phraseText = phrase.description
         }
     }
 
@@ -169,6 +196,11 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
             restoreProcessPriority()
         }
 
+        viewModelScope.launch {
+            delay(800)
+            clearResults()
+            loadNewPhrase()
+        }
         canTranscribe = true
     }
 
@@ -192,13 +224,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                 )
             )
 
-            // look up the existing phrase (inserted at app startup)
-            val existingPhrase =
-                db.phraseDao().getAll().firstOrNull { it.description == phraseText }
-            val patternId: UUID = existingPhrase?.id
-                ?: UUID.nameUUIDFromBytes(phraseText.lowercase().toByteArray())
-
-            // create and upsert audio file
+            val patternId: UUID? = currentPhrase?.id
             val audioId = UUID.randomUUID()
             val audio = AudioFile(
                 id = audioId,
@@ -211,27 +237,16 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                 phraseId = patternId
             )
             db.audioFileDao().upsert(audio)
-
-            // create and upsert audio report
-            val reportId = UUID.randomUUID()
-            val report = AudioReport(
-                id = reportId,
-                averageWordsPerMinute = analysis.wpm.toFloat(),
-                averageWordErrorRate = analysis.wer.toFloat(),
-                allTestsDescription =
-                    "wpm=${analysis.wpm};wer=${String.format("%.1f", analysis.wer)};text=$transcribedText",
-                userId = CurrentUser.ID,
-                mainAudioFileId = audioId
-            )
-            db.audioReportDao().upsert(report)
-            db.audioReportDao().link(
-                AudioReportGroup(
-                    idAudioReport = reportId,
-                    idAudioFile = audioId
+            sessionItems.add(
+                SessionItem(
+                    audioId = audioId,
+                    phraseId = patternId,
+                    phraseText = phraseText,
+                    wpm = analysis.wpm,
+                    wer = analysis.wer
                 )
             )
-
-            // create and upsert coherence report
+            sessionCount = sessionItems.size
             val coherenceId = UUID.randomUUID()
             val coherence = CoherenceReport(
                 id = coherenceId,
@@ -245,7 +260,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
             db.coherenceReportDao().upsert(coherence)
             db.coherenceReportDao().link(
                 CoherenceReportGroup(
-                    idPhrase = patternId,
+                    idPhrase = patternId ?: UUID.nameUUIDFromBytes(phraseText.lowercase().toByteArray()),
                     idCoherenceReport = coherenceId
                 )
             )
@@ -255,6 +270,49 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     fun clearResults() {
         transcriptionResult = ""
         analysisResult = null
+    }
+
+    fun finishSession(onFinished: (saved: Boolean) -> Unit = {}) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val saved = if (sessionItems.size >= minAudiosRequired) {
+                val snapshot = sessionItems.toList()
+                val avgWpm = snapshot.map { it.wpm }.average().toFloat()
+                val avgWer = snapshot.map { it.wer }.average().toFloat()
+                val mainFileId = sessionItems.firstOrNull()?.audioId
+                val desc = buildString {
+                    append("count=${sessionItems.size};avgWpm=${String.format("%.1f", avgWpm)};avgWer=${String.format("%.1f", avgWer)}")
+                }
+                val report = AudioReport(
+                    id = UUID.randomUUID(),
+                    averageWordsPerMinute = avgWpm,
+                    averageWordErrorRate = avgWer,
+                    allTestsDescription = desc,
+                    userId = CurrentUser.ID,
+                    mainAudioFileId = mainFileId
+                )
+                val db = DbProvider.db(application)
+                db.audioReportDao().insertWithFiles(report, snapshot.map { it.audioId })
+                val items = snapshot.map { SessionSummaryItem(it.phraseText, it.wpm, it.wer) }
+                sessionSummary = SessionSummary(avgWpm, avgWer, items)
+                true
+            } else {
+                false
+            }
+            sessionItems.clear()
+            sessionCount = 0
+            onFinished(saved)
+        }
+    }
+
+    fun discardSession() {
+        sessionItems.clear()
+        sessionCount = 0
+    }
+
+    fun dismissSummary() {
+        sessionSummary = null
+        clearResults()
+        loadNewPhrase()
     }
     
     fun cancelRecording() {
