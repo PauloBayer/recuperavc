@@ -10,7 +10,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.TrendingUp
@@ -25,8 +24,6 @@ import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
- 
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -41,31 +38,61 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.platform.LocalContext
 import com.recuperavc.ui.components.HistoryDialog
 import com.recuperavc.ui.main.MainScreenViewModel
-import com.recuperavc.ui.main.AnalysisResult
 
 @Composable
 fun AudioAnalysisScreen(viewModel: MainScreenViewModel = viewModel(factory = MainScreenViewModel.factory()), onBack: () -> Unit) {
-    var showHistory by remember { mutableStateOf(false) }
+    var showEndDialog by remember { mutableStateOf(false) }
     AudioAnalysisContent(
         canTranscribe = viewModel.canTranscribe,
         isRecording = viewModel.isRecording,
         isLoading = viewModel.isLoading,
         isProcessing = viewModel.isProcessing,
-        transcriptionResult = viewModel.transcriptionResult,
-        analysisResult = viewModel.analysisResult,
         phraseText = viewModel.phraseText,
         isCancelling = viewModel.isCancelling,
+        sessionCount = viewModel.sessionCount,
         onRecordTapped = viewModel::toggleRecord,
         onCancelRecording = viewModel::cancelRecording,
-        onClearResults = {
-            viewModel.clearResults()
-            viewModel.loadNewPhrase()
-        },
-        onOpenHistory = { showHistory = true },
-        onBack = onBack
+        onClearResults = { viewModel.clearResults() },
+        onFinishSession = { viewModel.finishSession { saved -> } },
+        onBack = { showEndDialog = true }
     )
-    if (showHistory) {
-        HistoryDialog(onDismiss = { showHistory = false })
+    if (showEndDialog) {
+        val count = viewModel.sessionCount
+        AlertDialog(
+            onDismissRequest = { showEndDialog = false },
+            confirmButton = {
+                Button(onClick = {
+                    if (count >= 3) {
+                        viewModel.finishSession { _ -> }
+                    } else {
+                        viewModel.discardSession()
+                        onBack()
+                    }
+                    showEndDialog = false
+                }) {
+                    Text(if (count >= 3) "Salvar e Sair" else "Descartar e Sair")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEndDialog = false }) { Text("Continuar") }
+            },
+            title = { Text("Encerrar sessão") },
+            text = {
+                Text(
+                    if (count >= 3)
+                        "Você gravou ${count} áudios. Deseja salvar o relatório e sair?"
+                    else
+                        "Você gravou ${count} de 3 áudios mínimos. Se sair agora, os resultados não serão salvos."
+                )
+            }
+        )
+    }
+
+    viewModel.sessionSummary?.let { summary ->
+        SessionSummaryScreen(
+            summary = summary,
+            onClose = { viewModel.dismissSummary() }
+        )
     }
 }
 
@@ -76,14 +103,13 @@ private fun AudioAnalysisContent(
     isRecording: Boolean,
     isLoading: Boolean,
     isProcessing: Boolean,
-    transcriptionResult: String,
-    analysisResult: AnalysisResult?,
     phraseText: String,
     isCancelling: Boolean,
+    sessionCount: Int,
     onRecordTapped: () -> Unit,
     onCancelRecording: () -> Unit,
     onClearResults: () -> Unit,
-    onOpenHistory: () -> Unit,
+    onFinishSession: () -> Unit,
     onBack: () -> Unit
 ) {
     Box(
@@ -106,18 +132,22 @@ private fun AudioAnalysisContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onOpenHistory) {
-                Icon(
-                    imageVector = Icons.Default.History,
-                    contentDescription = "Histórico",
-                    tint = OnBackground,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
             BackButton(onBack)
+        }
+
+        if (!isLoading) {
+            Text(
+                text = "Sessão ${sessionCount} de 3 (mínimo)",
+                color = OnBackground,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .padding(top = 72.dp)
+                    .align(Alignment.TopCenter)
+            )
         }
 
         if (isLoading) {
@@ -149,7 +179,7 @@ private fun AudioAnalysisContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Spacer(modifier = Modifier.height(60.dp))
+                Spacer(modifier = Modifier.height(120.dp))
 
                 Text(
                     text = "Pronuncie a frase abaixo\npara avaliar sua recuperação",
@@ -183,26 +213,50 @@ private fun AudioAnalysisContent(
                     lineHeight = 32.sp
                 )
 
-                Spacer(modifier = Modifier.height(32.dp))
-                
-                if (isRecording) {
-                    Button(
-                        onClick = onCancelRecording,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFD32F2F)
-                        ),
-                        modifier = Modifier
-                            .size(56.dp),
-                        shape = CircleShape
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Cancel,
-                            contentDescription = "Cancelar gravação",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
+                Column {
+                    if (sessionCount >= 3) {
+                        Button(
+                            onClick = onFinishSession,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp)
+                                .height(48.dp)
+                        ) {
+                            Text(
+                                text = "Registrar e Salvar Sessão",
+                                color = Color(0xFF2E7D32),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
+
+                    if (isRecording) {
+                        Button(
+                            onClick = onCancelRecording,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFD32F2F)
+                            ),
+                            modifier = Modifier
+                                .size(56.dp)
+                                .align(Alignment.CenterHorizontally),
+                            shape = CircleShape
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Cancel,
+                                contentDescription = "Cancelar gravação",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(32.dp))
                 }
             }
 
@@ -235,32 +289,6 @@ private fun AudioAnalysisContent(
                         textAlign = TextAlign.Center
                     )
                 }
-            }
-        }
-
-        if ((transcriptionResult.isNotEmpty() || analysisResult != null) && !isProcessing) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.3f))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .blur(8.dp)
-                        .background(
-                            brush = Brush.radialGradient(
-                                colors = listOf(GreenLight, GreenPrimary, BackgroundGreen),
-                                radius = 1200f
-                            )
-                        )
-                )
-                
-                ResultsSection(
-                    transcriptionResult = transcriptionResult,
-                    analysisResult = analysisResult,
-                    onNewExercise = onClearResults
-                )
             }
         }
     }
@@ -449,7 +477,6 @@ private fun RecordingCircles(
         }
     }
 }
-
 @Composable
 private fun BackButton(onBack: () -> Unit) {
     IconButton(onClick = onBack) {
@@ -460,169 +487,6 @@ private fun BackButton(onBack: () -> Unit) {
             modifier = Modifier.size(28.dp)
         )
     }
-}
-
- 
-
-@Composable
-private fun ResultsSection(
-    transcriptionResult: String,
-    analysisResult: AnalysisResult?,
-    onNewExercise: () -> Unit
-) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Spacer(modifier = Modifier.height(60.dp))
-
-            Text(
-                text = "Resultado da Análise",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = OnBackground,
-                textAlign = TextAlign.Center
-            )
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                if (transcriptionResult.isNotEmpty()) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color.White.copy(alpha = 0.95f)
-                        ),
-                        shape = RoundedCornerShape(16.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(20.dp)
-                        ) {
-                            Text(
-                                text = "Fala Reconhecida",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = GreenDark,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = "\"$transcriptionResult\"",
-                                fontSize = 18.sp,
-                                fontStyle = FontStyle.Italic,
-                                color = Color.Black.copy(alpha = 0.8f),
-                                lineHeight = 24.sp,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-                }
-
-                analysisResult?.let { result ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        MetricCard(
-                            title = "Velocidade",
-                            value = "${result.wpm}",
-                            unit = "WPM",
-                            color = when {
-                                result.wpm >= 100 -> GreenDark
-                                result.wpm >= 50 -> Color(0xFFF57C00)
-                                else -> Color(0xFF1976D2)
-                            },
-                            icon = Icons.Default.Speed
-                        )
-
-                        Spacer(modifier = Modifier.width(16.dp))
-
-                        MetricCard(
-                            title = "Precisão",
-                            value = "${String.format("%.1f", 100 - result.wer)}",
-                            unit = "%",
-                            color = when {
-                                result.wer <= 15 -> GreenDark
-                                result.wer <= 30 -> Color(0xFFF57C00)
-                                else -> Color(0xFF1976D2)
-                            },
-                            icon = Icons.Default.TrendingUp
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(28.dp))
-
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color.White.copy(alpha = 0.92f)
-                        ),
-                        shape = RoundedCornerShape(16.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-                    ) {
-                        Text(
-                            text = when {
-                                result.wer <= 15 && result.wpm >= 80 -> "Ótimo progresso! Sua fala está bem desenvolvida."
-                                result.wer <= 30 && result.wpm >= 40 -> "Progresso consistente! Continue com os exercícios."
-                                else -> "Mantenha a regularidade nos exercícios de reabilitação."
-                            },
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = when {
-                                result.wer <= 15 && result.wpm >= 80 -> GreenDark
-                                result.wer <= 30 && result.wpm >= 40 -> Color(0xFFE65100)
-                                else -> Color(0xFF1565C0)
-                            },
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(20.dp),
-                            lineHeight = 22.sp
-                        )
-                    }
-                }
-            }
-
-            Button(
-                onClick = onNewExercise,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = GreenDark
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Mic,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Novo Exercício",
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
 }
 
 @Composable
@@ -676,6 +540,86 @@ private fun MetricCard(
                     fontWeight = FontWeight.Medium,
                     color = color.copy(alpha = 0.7f)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessionSummaryScreen(summary: MainScreenViewModel.SessionSummary, onClose: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.35f))
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+                .align(Alignment.Center),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("Relatório do Teste", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = OnBackground)
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    MetricCard(
+                        title = "Velocidade média",
+                        value = String.format("%.0f", summary.avgWpm),
+                        unit = "WPM",
+                        color = GreenDark,
+                        icon = Icons.Default.Speed
+                    )
+                    MetricCard(
+                        title = "Precisão média",
+                        value = String.format("%.1f", 100 - summary.avgWer),
+                        unit = "%",
+                        color = GreenDark,
+                        icon = Icons.Default.TrendingUp
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+                Text("Tentativas", fontWeight = FontWeight.SemiBold, color = OnBackground)
+                Spacer(Modifier.height(8.dp))
+                summary.items.forEachIndexed { idx, item ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.95f)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text("${idx + 1}. ${item.phrase}", fontWeight = FontWeight.Medium, color = Color.Black)
+                            Spacer(Modifier.height(6.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Text("WPM: ${item.wpm}", color = GreenDark)
+                                Text("Precisão: ${String.format("%.1f", 100 - item.wer)}%", color = GreenDark)
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                Button(
+                    onClick = onClose,
+                    colors = ButtonDefaults.buttonColors(containerColor = GreenDark),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Mic, contentDescription = null, tint = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Novo teste", color = Color.White)
+                }
             }
         }
     }
