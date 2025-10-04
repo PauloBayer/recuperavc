@@ -279,9 +279,23 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                 val avgWpm = snapshot.map { it.wpm }.average().toFloat()
                 val avgWer = snapshot.map { it.wer }.average().toFloat()
                 val mainFileId = sessionItems.firstOrNull()?.audioId
-                val desc = buildString {
-                    append("count=${sessionItems.size};avgWpm=${String.format("%.1f", avgWpm)};avgWer=${String.format("%.1f", avgWer)}")
-                }
+                val desc = org.json.JSONObject().apply {
+                    put("count", snapshot.size)
+                    put("avgWpm", avgWpm)
+                    put("avgWer", avgWer)
+                    val arr = org.json.JSONArray()
+                    snapshot.forEach { it ->
+                        arr.put(
+                            org.json.JSONObject().apply {
+                                put("fileId", it.audioId.toString())
+                                put("phrase", it.phraseText)
+                                put("wpm", it.wpm)
+                                put("wer", it.wer)
+                            }
+                        )
+                    }
+                    put("attempts", arr)
+                }.toString()
                 val report = AudioReport(
                     id = UUID.randomUUID(),
                     averageWordsPerMinute = avgWpm,
