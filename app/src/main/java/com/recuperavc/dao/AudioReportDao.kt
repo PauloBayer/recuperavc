@@ -26,4 +26,8 @@ interface AudioReportDao {
             link(AudioReportGroup(idAudioReport = report.id, idAudioFile = fid))
         }
     }
+
+    @Transaction
+    @Query("SELECT * FROM AudioReport WHERE fk_User_id = :userId")
+    fun observeWithFilesForUser(userId: Int): Flow<List<AudioReportWithFiles>>
 }

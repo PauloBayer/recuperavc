@@ -55,7 +55,6 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
-import com.recuperavc.ui.components.HistoryDialog
 import com.recuperavc.ui.theme.BackgroundGreen
 import com.recuperavc.ui.theme.GreenDark
 import com.recuperavc.ui.theme.GreenLight
@@ -66,10 +65,10 @@ fun HomeScreen(
     onOpenSentenceTest: () -> Unit = {},
     onOpenAudioTest: () -> Unit,
     onOpenMotionTest: () -> Unit,
+    onOpenReports: () -> Unit = {},
     onExit: () -> Unit
 ) {
     val drawerState: DrawerState = rememberDrawerState(DrawerValue.Closed)
-    var showReports by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     ModalNavigationDrawer(
@@ -107,7 +106,7 @@ fun HomeScreen(
                 NavigationDrawerItem(
                     label = { Text("Relatórios") },
                     selected = false,
-                    onClick = { showReports = true },
+                    onClick = { onOpenReports(); scope.launch { drawerState.close() } },
                     icon = { Icon(Icons.Default.Summarize, contentDescription = null) },
                     colors = NavigationDrawerItemDefaults.colors(
                         selectedContainerColor = Color.White.copy(alpha = 0.16f),
@@ -214,9 +213,6 @@ fun HomeScreen(
                 )
             }
 
-            if (showReports) {
-                HistoryDialog(onDismiss = { showReports = false })
-            }
         }
     }
 }
