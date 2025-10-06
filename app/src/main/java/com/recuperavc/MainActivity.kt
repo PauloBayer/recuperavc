@@ -13,9 +13,10 @@ import com.recuperavc.ui.main.AudioAnalysisScreen
 import com.recuperavc.ui.main.MainScreenViewModel
 import com.recuperavc.ui.main.SentenceArrangeScreen
 import com.recuperavc.ui.main.MotionTestScreen
+import com.recuperavc.ui.reports.ReportsScreen
 import com.recuperavc.ui.theme.WhisperCppDemoTheme
 
-enum class AppRoute { Home, AudioAnalysis, SentenceArrange, MotionTest }
+enum class AppRoute { Home, AudioAnalysis, SentenceArrange, MotionTest, Reports }
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainScreenViewModel by viewModels { MainScreenViewModel.factory() }
@@ -30,6 +31,7 @@ class MainActivity : ComponentActivity() {
                         onOpenSentenceTest = { route = AppRoute.SentenceArrange },
                         onOpenAudioTest = { route = AppRoute.AudioAnalysis },
                         onOpenMotionTest = { route = AppRoute.MotionTest },
+                        onOpenReports = { route = AppRoute.Reports },
                         onExit = { finishAffinity() }
                     )
                     AppRoute.AudioAnalysis -> AudioAnalysisScreen(
@@ -45,6 +47,7 @@ class MainActivity : ComponentActivity() {
                         onFinish = { },
                         onBack = { route = AppRoute.Home }
                     )
+                    AppRoute.Reports -> ReportsScreen(onBack = { route = AppRoute.Home })
                 }
             }
         }

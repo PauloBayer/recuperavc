@@ -28,8 +28,11 @@ import com.recuperavc.models.AudioReport
 import com.recuperavc.models.AudioReportGroup
 import com.recuperavc.models.CoherenceReport
 import com.recuperavc.models.CoherenceReportGroup
+import com.recuperavc.models.Phrase
+import com.recuperavc.models.enums.PhraseType
 import java.time.Instant
 import java.util.UUID
+import kotlinx.coroutines.delay
 
 private const val LOG_TAG = "MainScreenViewModel"
 
@@ -57,6 +60,25 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     var phraseText by mutableStateOf("")
         private set
 
+    private var currentPhrase: Phrase? = null
+
+    var sessionCount by mutableStateOf(0)
+        private set
+    private val minAudiosRequired = 3
+    private data class SessionItem(
+        val audioId: UUID,
+        val phraseId: UUID?,
+        val phraseText: String,
+        val wpm: Int,
+        val wer: Double
+    )
+    private val sessionItems = mutableListOf<SessionItem>()
+
+    data class SessionSummaryItem(val phrase: String, val wpm: Int, val wer: Double)
+    data class SessionSummary(val avgWpm: Float, val avgWer: Float, val items: List<SessionSummaryItem>)
+    var sessionSummary by mutableStateOf<SessionSummary?>(null)
+        private set
+
     private val modelsPath = File(application.filesDir, "models")
     private val samplesPath = File(application.filesDir, "samples")
     private val recordingsPath = File(application.filesDir, "recordings")
@@ -65,9 +87,9 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     private var mediaPlayer: MediaPlayer? = null
     private var recordedFile: File? = null
     private var recordingStartTime: Long = 0
-
+    
     private val phraseManager = PhraseManager(application)
-
+    
     private val highPerformanceDispatcher = Dispatchers.Default.limitedParallelism(
         Runtime.getRuntime().availableProcessors().coerceAtLeast(4)
     )
@@ -90,12 +112,19 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
             isLoading = false
         }
     }
-
     fun loadNewPhrase() {
         viewModelScope.launch {
-            phraseText = phraseManager.getNextPhrase("media")
+            val nextType = when (sessionCount % 3) {
+                0 -> PhraseType.SHORT
+                1 -> PhraseType.MEDIUM
+                else -> PhraseType.BIG
+            }
+            val phrase = phraseManager.getNextPhrase(nextType)
+            currentPhrase = phrase
+            phraseText = phrase.description
         }
     }
+
 
     private suspend fun copyAssets() = withContext(Dispatchers.IO) {
         modelsPath.mkdirs()
@@ -107,10 +136,10 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     private suspend fun loadBaseModel() = withContext(Dispatchers.IO) {
         val models = application.assets.list("models/")
         if (models != null) {
-            whisperContext = com.whispercpp.whisper.WhisperContext
-                .createContextFromAsset(application.assets, "models/" + models[0])
+            whisperContext = com.whispercpp.whisper.WhisperContext.createContextFromAsset(application.assets, "models/" + models[0])
         }
     }
+
 
     private suspend fun readAudioSamples(file: File): FloatArray = withContext(Dispatchers.IO) {
         stopPlayback()
@@ -130,7 +159,9 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     }
 
     private suspend fun transcribeAudio(file: File, recordingDurationMs: Long) {
-        if (!canTranscribe) return
+        if (!canTranscribe) {
+            return
+        }
 
         canTranscribe = false
         isProcessing = true
@@ -138,27 +169,22 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         try {
             withContext(highPerformanceDispatcher) {
                 boostProcessPriority()
-
+                
                 val data = readAudioSamples(file)
                 val rawText = whisperContext?.transcribeData(data)?.trim() ?: ""
-
+                
                 val cleanText = extractCleanText(rawText).lowercase()
-
-                val analysis = if (cleanText.isNotEmpty())
-                    calculateAnalysis(cleanText, recordingDurationMs)
-                else
-                    null
-
+                
+                val analysis = if (cleanText.isNotEmpty()) calculateAnalysis(cleanText, recordingDurationMs) else null
                 withContext(Dispatchers.Main) {
                     transcriptionResult = cleanText
                     analysisResult = analysis
                     isProcessing = false
                 }
-
                 if (analysis != null) {
                     persistResults(file, recordingDurationMs, cleanText, analysis)
                 }
-
+                
                 restoreProcessPriority()
             }
         } catch (e: Exception) {
@@ -169,6 +195,11 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
             restoreProcessPriority()
         }
 
+        viewModelScope.launch {
+            delay(800)
+            clearResults()
+            loadNewPhrase()
+        }
         canTranscribe = true
     }
 
@@ -181,10 +212,20 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         withContext(Dispatchers.IO) {
             val db = DbProvider.db(application)
 
-            // Look up the existing phrase (inserted at app startup)
-            val existingPhrase = db.phraseDao().getAll().firstOrNull { it.description == phraseText }
-            val patternId: UUID = existingPhrase?.id
-                ?: UUID.nameUUIDFromBytes(phraseText.lowercase().toByteArray())
+            val phraseDao = db.phraseDao()
+            val ensuredPhrase: Phrase = currentPhrase
+                ?: phraseDao.getAll().firstOrNull { it.description == phraseText }
+                ?: run {
+                    val inferredType = when (sessionCount % 3) {
+                        0 -> PhraseType.SHORT
+                        1 -> PhraseType.MEDIUM
+                        else -> PhraseType.BIG
+                    }
+                    val created = Phrase(description = phraseText, type = inferredType)
+                    phraseDao.upsert(created)
+                    created
+                }
+            val phraseId: UUID = ensuredPhrase.id
 
             // 1) AudioFile
             val audioId = UUID.randomUUID()
@@ -195,9 +236,20 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                 fileName = file.name,
                 audioDuration = recordingDurationMs.toInt(),
                 recordedAt = Instant.now(),
-                phraseId = patternId
+                phraseId = phraseId
             )
             db.audioFileDao().upsert(audio)
+
+            // Track this attempt in-memory for the session
+            sessionItems.add(
+                SessionItem(
+                    audioId = audioId,
+                    phraseId = phraseId,
+                    phraseText = phraseText,
+                    wpm = analysis.wpm,
+                    wer = analysis.wer
+                )
+            )
 
             // 2) AudioReport
             val reportId = UUID.randomUUID()
@@ -217,18 +269,19 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
             )
 
             // 3) CoherenceReport
+            sessionCount = sessionItems.size
             val coherenceId = UUID.randomUUID()
             val coherence = CoherenceReport(
                 id = coherenceId,
                 averageErrorsPerTry = analysis.wer.toFloat(),
                 averageTimePerTry = recordingDurationMs / 1000.0f,
                 allTestsDescription = "score=${String.format("%.1f", 100 - analysis.wer)};expected=$phraseText;transcribed=$transcribedText",
-                phraseId = patternId
+                phraseId = phraseId
             )
             db.coherenceReportDao().upsert(coherence)
             db.coherenceReportDao().link(
                 CoherenceReportGroup(
-                    idPhrase = patternId,
+                    idPhrase = phraseId,
                     idCoherenceReport = coherenceId
                 )
             )
@@ -238,6 +291,62 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     fun clearResults() {
         transcriptionResult = ""
         analysisResult = null
+    }
+
+    fun finishSession(onFinished: (saved: Boolean) -> Unit = {}) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val saved = if (sessionItems.size >= minAudiosRequired) {
+                val snapshot = sessionItems.toList()
+                val avgWpm = snapshot.map { it.wpm }.average().toFloat()
+                val avgWer = snapshot.map { it.wer }.average().toFloat()
+                val mainFileId = sessionItems.firstOrNull()?.audioId
+                val desc = org.json.JSONObject().apply {
+                    put("count", snapshot.size)
+                    put("avgWpm", avgWpm)
+                    put("avgWer", avgWer)
+                    val arr = org.json.JSONArray()
+                    snapshot.forEach { it ->
+                        arr.put(
+                            org.json.JSONObject().apply {
+                                put("fileId", it.audioId.toString())
+                                put("phrase", it.phraseText)
+                                put("wpm", it.wpm)
+                                put("wer", it.wer)
+                            }
+                        )
+                    }
+                    put("attempts", arr)
+                }.toString()
+                val report = AudioReport(
+                    id = UUID.randomUUID(),
+                    averageWordsPerMinute = avgWpm,
+                    averageWordErrorRate = avgWer,
+                    allTestsDescription = desc,
+                    mainAudioFileId = mainFileId
+                )
+                val db = DbProvider.db(application)
+                db.audioReportDao().insertWithFiles(report, snapshot.map { it.audioId })
+                val items = snapshot.map { SessionSummaryItem(it.phraseText, it.wpm, it.wer) }
+                sessionSummary = SessionSummary(avgWpm, avgWer, items)
+                true
+            } else {
+                false
+            }
+            sessionItems.clear()
+            sessionCount = 0
+            onFinished(saved)
+        }
+    }
+
+    fun discardSession() {
+        sessionItems.clear()
+        sessionCount = 0
+    }
+
+    fun dismissSummary() {
+        sessionSummary = null
+        clearResults()
+        loadNewPhrase()
     }
 
     fun cancelRecording() {
@@ -261,7 +370,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                 transcriptionResult = ""
                 analysisResult = null
                 val file = getTempFileForRecording()
-                recorder.startRecording(file, { _ ->
+                recorder.startRecording(file, { e ->
                     viewModelScope.launch {
                         withContext(Dispatchers.Main) {
                             isRecording = false
@@ -300,28 +409,34 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         val ts = java.time.LocalDateTime.now().format(fmt)
         File(recordingsPath, "rec_${ts}_${short}.wav")
     }
-
+    
     private fun boostProcessPriority() {
         try {
             Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+        }
     }
-
+    
     private fun restoreProcessPriority() {
         try {
             Process.setThreadPriority(Process.THREAD_PRIORITY_DEFAULT)
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+        }
     }
-
+    
     private fun extractCleanText(whisperOutput: String): String {
         var cleanText = whisperOutput.replace("\\[.*?\\]".toRegex(), "")
+        
         cleanText = cleanText.replace(":", "").trim()
+        
         cleanText = cleanText.replace("\\s+".toRegex(), " ")
             .replace(".", "")
             .replace(",", "")
             .replace("!", "")
             .replace("?", "")
             .trim()
+        
+        
         return cleanText
     }
 
@@ -330,32 +445,33 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
             .replace(Regex("[.,!?;:\"'()\\[\\]{}]"), "")
             .replace("\\s+".toRegex(), " ")
             .trim()
-
         val expectedWords = cleanExpectedText.split("\\s+".toRegex()).filter { it.isNotBlank() }
         val transcribedWords = transcribedText.lowercase().split("\\s+".toRegex()).filter { it.isNotBlank() }
-
+        
         Log.d(LOG_TAG, "Análise: $expectedWords vs $transcribedWords")
 
         val recordingDurationMinutes = recordingDurationMs / 60000.0
         val wpm = if (recordingDurationMinutes > 0) {
             (transcribedWords.size / recordingDurationMinutes).toInt()
-        } else 0
+        } else {
+            0
+        }
 
         val wer = calculateWER(expectedWords, transcribedWords)
-
+        
         Log.d(LOG_TAG, "Precisão: ${String.format("%.1f", 100 - wer)}%")
 
         return AnalysisResult(wpm, wer)
     }
-
+    
     private fun calculateWER(expected: List<String>, transcribed: List<String>): Double {
         if (expected.isEmpty()) return 0.0
-
+        
         val dp = Array(expected.size + 1) { IntArray(transcribed.size + 1) }
-
+        
         for (i in 0..expected.size) dp[i][0] = i
         for (j in 0..transcribed.size) dp[0][j] = j
-
+        
         for (i in 1..expected.size) {
             for (j in 1..transcribed.size) {
                 dp[i][j] = if (expected[i - 1].equals(transcribed[j - 1], ignoreCase = true)) {
@@ -369,7 +485,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                 }
             }
         }
-
+        
         val editDistance = dp[expected.size][transcribed.size]
         return (editDistance.toDouble() / expected.size) * 100
     }

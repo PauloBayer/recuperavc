@@ -2,66 +2,54 @@ package com.recuperavc.library
 
 import android.content.Context
 import android.content.SharedPreferences
-import java.text.Normalizer
+import com.recuperavc.data.db.DbProvider
+import com.recuperavc.models.Phrase
+import com.recuperavc.models.enums.PhraseType
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.text.Normalizer
 
 class PhraseManager(private val context: Context) {
-    private val preferences: SharedPreferences = context.applicationContext.getSharedPreferences("phrase_cooldown", Context.MODE_PRIVATE)
+    private val preferences: SharedPreferences =
+        context.applicationContext.getSharedPreferences("phrase_cooldown", Context.MODE_PRIVATE)
     private val mutex = Mutex()
-    
-    private val cooldownHours = 1L // aqui fica o tempo que a frase não irá voltar, dá pra mudar o tempo
+    private val cooldownHours = 1L
     private val cooldownMillis = cooldownHours * 60 * 60 * 1000
-    
+
     private var lastUsedPhrase: String? = null
-    
-    suspend fun getNextPhrase(tamanho: String = "curta"): String = mutex.withLock {
-        val primaryPhrases = getAvailablePhrases(tamanho)
-        val secondaryPhrases = getAvailablePhrases(if (tamanho == "curta") "media" else "curta")
-        val availablePhrases = primaryPhrases + secondaryPhrases
-        val selectedPhrase = if (availablePhrases.isEmpty()) {
-            val allPrimary = getAllPhrases(tamanho)
-            val allSecondary = getAllPhrases(if (tamanho == "curta") "media" else "curta")
-            val all = allPrimary + allSecondary
-            all.minByOrNull { preferences.getLong(keyFor(it), 0L) } ?: allPrimary.random()
+
+    suspend fun getNextPhrase(type: PhraseType = PhraseType.MEDIUM): Phrase = mutex.withLock {
+        val dao = DbProvider.db(context).phraseDao()
+        val primary = dao.getByType(type)
+        val secondary = when (type) {
+            PhraseType.SHORT -> dao.getByType(PhraseType.MEDIUM)
+            PhraseType.MEDIUM -> dao.getByType(PhraseType.SHORT)
+            PhraseType.BIG -> dao.getByType(PhraseType.MEDIUM)
+        }
+        val available = (primary + secondary).distinctBy { it.id }
+            .filter { isPhraseOutOfCooldown(it.description) }
+
+        val selected = if (available.isEmpty()) {
+            val all = (primary + secondary).distinctBy { it.id }
+            all.minByOrNull { preferences.getLong(keyFor(it.description), 0L) }
+                ?: all.first()
         } else {
-            availablePhrases.firstOrNull { it != lastUsedPhrase }
-                ?: availablePhrases.random()
+            available.firstOrNull { it.description != lastUsedPhrase } ?: available.first()
         }
-        markPhraseAsUsed(selectedPhrase)
-        lastUsedPhrase = selectedPhrase
-        return selectedPhrase
+
+        markPhraseAsUsed(selected.description)
+        lastUsedPhrase = selected.description
+        return@withLock selected
     }
-    
-    private fun getAvailablePhrases(tamanho: String): List<String> {
-        val allPhrases = when (tamanho.lowercase()) {
-            "curta" -> PhraseLibrary.getAllShortPhrases()
-            "media" -> PhraseLibrary.getAllMiddlePhrases()
-            "longa" -> PhraseLibrary.getAllLongPhrases()
-            else -> PhraseLibrary.getAllShortPhrases()
-        }
-        
+
+    private fun isPhraseOutOfCooldown(phrase: String): Boolean {
         val currentTime = System.currentTimeMillis()
-        
-        return allPhrases.filter { phrase ->
-            val lastUsedTime = preferences.getLong(keyFor(phrase), 0L)
-            (currentTime - lastUsedTime) >= cooldownMillis
-        }
+        val lastUsedTime = preferences.getLong(keyFor(phrase), 0L)
+        return (currentTime - lastUsedTime) >= cooldownMillis
     }
-    
-    private fun getAllPhrases(tamanho: String): List<String> {
-        return when (tamanho.lowercase()) {
-            "curta" -> PhraseLibrary.getAllShortPhrases()
-            "media" -> PhraseLibrary.getAllMiddlePhrases()
-            "longa" -> PhraseLibrary.getAllLongPhrases()
-            else -> PhraseLibrary.getAllShortPhrases()
-        }
-    }
-    
+
     private fun markPhraseAsUsed(phrase: String) {
-        preferences.edit()
-            .putLong(keyFor(phrase), System.currentTimeMillis())
-            .commit()
+        preferences.edit().putLong(keyFor(phrase), System.currentTimeMillis()).commit()
     }
 
     private fun keyFor(phrase: String): String {

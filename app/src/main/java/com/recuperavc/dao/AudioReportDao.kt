@@ -16,6 +16,14 @@ interface AudioReportDao {
     @Query("SELECT * FROM AudioReport WHERE id = :reportId")
     fun observeWithFiles(reportId: UUID): Flow<AudioReportWithFiles?>
 
+    @Transaction
+    suspend fun insertWithFiles(report: AudioReport, fileIds: List<UUID>) {
+        upsert(report)
+        fileIds.forEach { fid ->
+            link(AudioReportGroup(idAudioReport = report.id, idAudioFile = fid))
+        }
+    }
+
     @Query("SELECT * FROM AudioReport")
     fun observeAll(): Flow<List<AudioReport>>
 }
