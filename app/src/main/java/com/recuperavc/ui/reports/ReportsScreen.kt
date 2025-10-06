@@ -93,6 +93,7 @@ fun ReportsScreen(onBack: () -> Unit) {
                 .fillMaxSize()
                 .background(Color.White)
         ) {
+            // Header fixo
             Box(modifier = Modifier.fillMaxWidth().height(120.dp)) {
                 Image(
                     painter = painterResource(id = R.drawable.wave_green),
@@ -113,11 +114,13 @@ fun ReportsScreen(onBack: () -> Unit) {
                 }
             }
 
+            // Título e Tabs fixos
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .fillMaxWidth()
+                    .background(Color.White)
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
@@ -130,7 +133,16 @@ fun ReportsScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 SegmentedTabs(tab = tab, onTab = { tab = it })
                 Spacer(Modifier.height(16.dp))
+            }
 
+            // Conteúdo scrollável
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 DateFilterCard(
                     startDate = startDate,
                     endDate = endDate,
