@@ -15,6 +15,9 @@ interface AudioFileDao {
     @Query("SELECT * FROM AudioFile WHERE fk_User_id = :userId ORDER BY recordedAt DESC")
     fun observeForUser(userId: Int): Flow<List<AudioFile>>
 
+    @Query("SELECT * FROM AudioFile WHERE id = :id")
+    suspend fun getById(id: UUID): AudioFile?
+
     @Query("DELETE FROM AudioFile WHERE id = :id")
     suspend fun delete(id: UUID)
 }
