@@ -19,7 +19,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.recuperavc.data.CurrentUser
 import com.recuperavc.data.db.DbProvider
 import com.recuperavc.models.MotionReport
 import com.recuperavc.ui.theme.GreenAccent
@@ -67,7 +66,7 @@ fun MotionTestScreen(
 
     // Histórico
     val history by db.MotionReportDao()
-        .observeForUser(CurrentUser.ID)
+        .observeAll()
         .collectAsState(initial = emptyList())
 
     val density = LocalDensity.current
@@ -143,8 +142,7 @@ fun MotionTestScreen(
                     withRightHand = (selectedHand == Hand.RIGHT),
                     withMainHand = (isDominant == true),
                     withMovement = (chosenMode == MotionMode.MOVING),
-                    missedClicks = missedClicks,
-                    userId = CurrentUser.ID
+                    missedClicks = missedClicks
                 )
                 scope.launch { db.MotionReportDao().upsert(report) }
                 lastReport = report

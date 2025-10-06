@@ -12,9 +12,9 @@ interface AudioFileDao {
     @Upsert
     suspend fun upsert(file: AudioFile)
 
-    @Query("SELECT * FROM AudioFile WHERE fk_User_id = :userId ORDER BY recordedAt DESC")
-    fun observeForUser(userId: Int): Flow<List<AudioFile>>
-
     @Query("DELETE FROM AudioFile WHERE id = :id")
     suspend fun delete(id: UUID)
+
+    @Query("SELECT * FROM AudioFile ORDER BY recordedAt DESC")
+    fun observeAll(): Flow<List<AudioFile>>
 }

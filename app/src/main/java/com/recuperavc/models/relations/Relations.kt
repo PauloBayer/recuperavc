@@ -10,16 +10,6 @@ import com.recuperavc.models.CoherenceReport
 import com.recuperavc.models.CoherenceReportGroup
 import com.recuperavc.models.MotionReport
 import com.recuperavc.models.Phrase
-import com.recuperavc.models.User
-
-data class UserWithAudioFiles(
-    @Embedded val user: User,
-    @Relation(
-        parentColumn = "id",
-        entityColumn = "fk_User_id"
-    )
-    val audioFiles: List<AudioFile>
-)
 
 data class AudioReportWithFiles(
     @Embedded val report: AudioReport,
@@ -47,13 +37,4 @@ data class CoherenceReportWithPhrases(
         )
     )
     val phrases: List<Phrase>
-)
-
-data class UserWithMotionReports(
-    @Embedded val user: User,
-    @Relation(
-        parentColumn = "id",
-        entityColumn = "fk_user_id"
-    )
-    val MotionReports: List<MotionReport>
 )

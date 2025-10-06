@@ -7,13 +7,6 @@ import java.util.UUID
     tableName = "AudioReport",
     foreignKeys = [
         ForeignKey(
-            entity = User::class,
-            parentColumns = ["id"],
-            childColumns = ["fk_User_id"],
-            onDelete = ForeignKey.CASCADE,
-            onUpdate = ForeignKey.CASCADE
-        ),
-        ForeignKey(
             entity = AudioFile::class,
             parentColumns = ["id"],
             childColumns = ["fk_AudioFile_id"],
@@ -21,13 +14,12 @@ import java.util.UUID
             onUpdate = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("fk_User_id"), Index("fk_AudioFile_id")]
+    indices = [Index("fk_AudioFile_id")]
 )
 data class AudioReport(
     @PrimaryKey val id: UUID = UUID.randomUUID(),
     val averageWordsPerMinute: Float,
     val averageWordErrorRate: Float,
     val allTestsDescription: String,
-    @ColumnInfo(name = "fk_User_id") val userId: Int,
     @ColumnInfo(name = "fk_AudioFile_id") val mainAudioFileId: UUID?
 )
