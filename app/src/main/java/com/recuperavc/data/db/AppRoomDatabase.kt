@@ -33,7 +33,7 @@ import com.recuperavc.models.Phrase
         CoherenceReportGroup::class,
         MotionReport::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -54,7 +54,7 @@ abstract class AppRoomDatabase : RoomDatabase() {
                     AppRoomDatabase::class.java,
                     "app.db"
                 )
-                    //.fallbackToDestructiveMigration() // <- só ativar isso aqui para ele limpar sozinho tudo do db se mudar o schema
+                    .fallbackToDestructiveMigration() // <- só ativar isso aqui para ele limpar sozinho tudo do db se mudar o schema
                     .build()
                     .also { INSTANCE = it }
             }

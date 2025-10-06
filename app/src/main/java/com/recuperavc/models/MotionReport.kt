@@ -26,6 +26,9 @@ data class MotionReport(
     val secondsTotal: Float,
     val clicksPerMinute: Int,
     val totalClicks: Int,
+    val withRightHand: Boolean,
+    val withMainHand: Boolean,
+    val withMovement: Boolean,
     @ColumnInfo(defaultValue = "0") val missedClicks: Int,
     @ColumnInfo(name = "fk_user_id") val userId: Int
 )
