@@ -26,10 +26,10 @@ import com.recuperavc.data.db.DbProvider
 import com.recuperavc.models.AudioFile
 import com.recuperavc.models.AudioReport
 import com.recuperavc.models.AudioReportGroup
-import com.recuperavc.models.CoeherenceReport
-import com.recuperavc.models.CoeherenceReportGroup
 import com.recuperavc.models.Phrase
 import com.recuperavc.models.enums.PhraseType
+import com.recuperavc.models.CoherenceReport
+import com.recuperavc.models.CoherenceReportGroup
 import java.time.Instant
 import java.util.UUID
 import kotlinx.coroutines.delay
