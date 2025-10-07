@@ -26,8 +26,8 @@ import com.recuperavc.data.db.DbProvider
 import com.recuperavc.models.AudioFile
 import com.recuperavc.models.AudioReport
 import com.recuperavc.models.AudioReportGroup
-import com.recuperavc.models.CoherenceReport
-import com.recuperavc.models.CoherenceReportGroup
+import com.recuperavc.models.CoeherenceReport
+import com.recuperavc.models.CoeherenceReportGroup
 import com.recuperavc.models.Phrase
 import com.recuperavc.models.enums.PhraseType
 import java.time.Instant
@@ -70,7 +70,8 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         val phraseId: UUID?,
         val phraseText: String,
         val wpm: Int,
-        val wer: Double
+        val wer: Double,
+        val transcribed: String
     )
     private val sessionItems = mutableListOf<SessionItem>()
 
@@ -247,7 +248,8 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                     phraseId = phraseId,
                     phraseText = phraseText,
                     wpm = analysis.wpm,
-                    wer = analysis.wer
+                    wer = analysis.wer,
+                    transcribed = transcribedText
                 )
             )
 
@@ -270,6 +272,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
 
             // 3) CoherenceReport
             sessionCount = sessionItems.size
+
             val coherenceId = UUID.randomUUID()
             val coherence = CoherenceReport(
                 id = coherenceId,
@@ -300,18 +303,20 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                 val avgWpm = snapshot.map { it.wpm }.average().toFloat()
                 val avgWer = snapshot.map { it.wer }.average().toFloat()
                 val mainFileId = sessionItems.firstOrNull()?.audioId
+                val database = DbProvider.db(application)
                 val desc = org.json.JSONObject().apply {
                     put("count", snapshot.size)
                     put("avgWpm", avgWpm)
                     put("avgWer", avgWer)
                     val arr = org.json.JSONArray()
-                    snapshot.forEach { it ->
+                    snapshot.forEach { item ->
                         arr.put(
                             org.json.JSONObject().apply {
-                                put("fileId", it.audioId.toString())
-                                put("phrase", it.phraseText)
-                                put("wpm", it.wpm)
-                                put("wer", it.wer)
+                                put("fileId", item.audioId.toString())
+                                put("phrase", item.phraseText)
+                                put("wpm", item.wpm)
+                                put("wer", item.wer)
+                                put("transcribed", item.transcribed)
                             }
                         )
                     }
@@ -324,8 +329,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                     allTestsDescription = desc,
                     mainAudioFileId = mainFileId
                 )
-                val db = DbProvider.db(application)
-                db.audioReportDao().insertWithFiles(report, snapshot.map { it.audioId })
+                database.audioReportDao().insertWithFiles(report, snapshot.map { it.audioId })
                 val items = snapshot.map { SessionSummaryItem(it.phraseText, it.wpm, it.wer) }
                 sessionSummary = SessionSummary(avgWpm, avgWer, items)
                 true

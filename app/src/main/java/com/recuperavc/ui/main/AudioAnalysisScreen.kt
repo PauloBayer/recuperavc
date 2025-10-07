@@ -91,7 +91,8 @@ fun AudioAnalysisScreen(viewModel: MainScreenViewModel = viewModel(factory = Mai
     viewModel.sessionSummary?.let { summary ->
         SessionSummaryScreen(
             summary = summary,
-            onClose = { viewModel.dismissSummary() }
+            onClose = { viewModel.dismissSummary() },
+            onNavigateHome = onBack
         )
     }
 }
@@ -546,7 +547,7 @@ private fun MetricCard(
 }
 
 @Composable
-private fun SessionSummaryScreen(summary: MainScreenViewModel.SessionSummary, onClose: () -> Unit) {
+private fun SessionSummaryScreen(summary: MainScreenViewModel.SessionSummary, onClose: () -> Unit, onNavigateHome: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -609,7 +610,7 @@ private fun SessionSummaryScreen(summary: MainScreenViewModel.SessionSummary, on
                         }
                     }
                 }
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(20.dp))
                 Button(
                     onClick = onClose,
                     colors = ButtonDefaults.buttonColors(containerColor = GreenDark),
@@ -618,7 +619,18 @@ private fun SessionSummaryScreen(summary: MainScreenViewModel.SessionSummary, on
                 ) {
                     Icon(imageVector = Icons.Default.Mic, contentDescription = null, tint = Color.White)
                     Spacer(Modifier.width(8.dp))
-                    Text("Novo teste", color = Color.White)
+                    Text("Novo teste", color = Color.White, fontSize = 16.sp)
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onNavigateHome,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = GreenDark
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("Voltar ao Início", fontSize = 16.sp)
                 }
             }
         }

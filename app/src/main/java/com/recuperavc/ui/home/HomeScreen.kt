@@ -1,6 +1,6 @@
 package com.recuperavc.ui.home
 
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -42,7 +42,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -55,6 +56,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
+import com.recuperavc.R
 import com.recuperavc.ui.theme.BackgroundGreen
 import com.recuperavc.ui.theme.GreenDark
 import com.recuperavc.ui.theme.GreenLight
@@ -80,28 +82,13 @@ fun HomeScreen(
                 drawerContainerColor = GreenLight,
                 drawerContentColor = Color.White
             ) {
-                Box(modifier = Modifier.fillMaxWidth().height(140.dp)) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val w = size.width
-                        val h = size.height
-                        val path = Path().apply {
-                            moveTo(0f, 0f)
-                            lineTo(0f, h * 0.55f)
-                            cubicTo(
-                                w * 0.25f, h * 0.20f,
-                                w * 0.55f, h * 0.95f,
-                                w * 0.80f, h * 0.60f
-                            )
-                            cubicTo(
-                                w * 0.90f, h * 0.40f,
-                                w, h * 0.48f,
-                                w, h * 0.38f
-                            )
-                            lineTo(w, 0f)
-                            close()
-                        }
-                        drawPath(path, color = GreenDark)
-                    }
+                Box(modifier = Modifier.fillMaxWidth().height(100.dp)) {
+                    Image(
+                        painter = painterResource(id = R.drawable.wave_light),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.FillBounds
+                    )
                 }
                 Spacer(Modifier.height(32.dp))
                 NavigationDrawerItem(
@@ -150,28 +137,13 @@ fun HomeScreen(
         }
     ) {
         Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
-            Box(modifier = Modifier.fillMaxWidth().height(160.dp)) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val w = size.width
-                    val h = size.height
-                    val path = Path().apply {
-                        moveTo(0f, 0f)
-                        lineTo(0f, h * 0.55f)
-                        cubicTo(
-                            w * 0.25f, h * 0.25f,
-                            w * 0.45f, h * 0.95f,
-                            w * 0.6f, h * 0.65f
-                        )
-                        cubicTo(
-                            w * 0.8f, h * 0.35f,
-                            w * 0.9f, h * 0.5f,
-                            w, h * 0.4f
-                        )
-                        lineTo(w, 0f)
-                        close()
-                    }
-                    drawPath(path, color = GreenLight)
-                }
+            Box(modifier = Modifier.fillMaxWidth().height(120.dp)) {
+                Image(
+                    painter = painterResource(id = R.drawable.wave_green),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.FillBounds
+                )
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -191,7 +163,7 @@ fun HomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 140.dp, start = 16.dp, end = 16.dp, bottom = 16.dp),
+                    .padding(top = 130.dp, start = 16.dp, end = 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.Top,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {

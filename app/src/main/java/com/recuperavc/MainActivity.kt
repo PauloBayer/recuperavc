@@ -13,7 +13,7 @@ import com.recuperavc.ui.main.AudioAnalysisScreen
 import com.recuperavc.ui.main.MainScreenViewModel
 import com.recuperavc.ui.main.SentenceArrangeScreen
 import com.recuperavc.ui.main.MotionTestScreen
-import com.recuperavc.ui.reports.ReportsScreen
+import com.recuperavc.ui.main.ReportsScreen
 import com.recuperavc.ui.settings.SettingsScreen
 import com.recuperavc.ui.theme.WhisperCppDemoTheme
 
