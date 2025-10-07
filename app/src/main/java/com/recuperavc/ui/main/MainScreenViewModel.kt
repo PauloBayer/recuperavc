@@ -25,7 +25,6 @@ import com.recuperavc.library.PhraseManager
 import com.recuperavc.data.db.DbProvider
 import com.recuperavc.models.AudioFile
 import com.recuperavc.models.AudioReport
-import com.recuperavc.models.AudioReportGroup
 import com.recuperavc.models.Phrase
 import com.recuperavc.models.enums.PhraseType
 import com.recuperavc.models.CoherenceReport
@@ -253,22 +252,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                 )
             )
 
-            // 2) AudioReport
-            val reportId = UUID.randomUUID()
-            val report = AudioReport(
-                id = reportId,
-                averageWordsPerMinute = analysis.wpm.toFloat(),
-                averageWordErrorRate = analysis.wer.toFloat(),
-                allTestsDescription = "wpm=${analysis.wpm};wer=${String.format("%.1f", analysis.wer)};text=$transcribedText",
-                mainAudioFileId = audioId
-            )
-            db.audioReportDao().upsert(report)
-            db.audioReportDao().link(
-                AudioReportGroup(
-                    idAudioReport = reportId,
-                    idAudioFile = audioId
-                )
-            )
+            
 
             // 3) CoherenceReport
             sessionCount = sessionItems.size

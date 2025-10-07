@@ -18,6 +18,7 @@ class App : Application() {
         android.util.Log.d("AppInit", "after DB init")
         CoroutineScope(Dispatchers.IO).launch {
             val db = DbProvider.db(applicationContext)
+            db.audioReportDao().deletePartialReports()
 
             // Aqui pega as frases que tão no banco pra adicionar as que faltam
             val phraseDao = db.phraseDao()
