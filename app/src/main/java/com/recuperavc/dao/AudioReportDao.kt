@@ -16,9 +16,6 @@ interface AudioReportDao {
     @Query("SELECT * FROM AudioReport WHERE id = :reportId")
     fun observeWithFiles(reportId: UUID): Flow<AudioReportWithFiles?>
 
-    @Query("SELECT * FROM AudioReport WHERE fk_User_id = :userId")
-    fun observeForUser(userId: Int): Flow<List<AudioReport>>
-
     @Transaction
     suspend fun insertWithFiles(report: AudioReport, fileIds: List<UUID>) {
         upsert(report)
@@ -28,6 +25,9 @@ interface AudioReportDao {
     }
 
     @Transaction
-    @Query("SELECT * FROM AudioReport WHERE fk_User_id = :userId")
-    fun observeWithFilesForUser(userId: Int): Flow<List<AudioReportWithFiles>>
+    @Query("SELECT * FROM AudioReport")
+    fun observeAllWithFiles(): kotlinx.coroutines.flow.Flow<List<com.recuperavc.models.relations.AudioReportWithFiles>>
+
+    @Query("SELECT * FROM AudioReport")
+    fun observeAll(): Flow<List<AudioReport>>
 }

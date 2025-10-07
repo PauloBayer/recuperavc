@@ -1,4 +1,4 @@
-package com.recuperavc.ui.reports
+package com.recuperavc.ui.main
 
 import android.app.DatePickerDialog
 import android.media.MediaPlayer
@@ -6,10 +6,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -18,8 +17,8 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Gesture
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,33 +26,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
 import com.recuperavc.R
-import com.recuperavc.data.CurrentUser
 import com.recuperavc.data.db.DbProvider
-import com.recuperavc.models.AudioFile
 import com.recuperavc.models.relations.AudioReportWithFiles
-import com.recuperavc.ui.theme.BackgroundGreen
 import com.recuperavc.ui.theme.GreenDark
 import com.recuperavc.ui.theme.GreenLight
 import com.recuperavc.ui.theme.OnBackground
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
 import java.io.File
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
-import java.time.temporal.ChronoUnit
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Calendar
-import kotlinx.coroutines.delay
 
 enum class ChartType { WPM, WER }
 
@@ -71,20 +67,18 @@ fun ReportsScreen(onBack: () -> Unit) {
     var endDate by remember { mutableStateOf(now) }
     var isDateManuallySet by remember { mutableStateOf(false) }
 
-    val audioReports by db.audioReportDao().observeWithFilesForUser(CurrentUser.ID)
-        .map { reports ->
-            reports.filter { rep ->
-                val date = rep.files.minOfOrNull { it.recordedAt } ?: return@filter false
-                date >= startDate && date <= endDate
-            }.sortedBy { rep -> rep.files.minOfOrNull { f -> f.recordedAt } }
+    val audioReports by db.audioReportDao()
+        .observeAllWithFiles()
+        .map { list ->
+            list.sortedBy { rep ->
+                rep.files.minOfOrNull { it.recordedAt ?: Instant.EPOCH } ?: Instant.EPOCH
+            }
         }
         .collectAsState(initial = emptyList())
 
-    val motionReports by db.MotionReportDao().observeForUser(CurrentUser.ID)
-        .map { reports ->
-            reports.filter { r -> r.date >= startDate && r.date <= endDate }
-                .sortedBy { r -> r.date }
-        }
+    val motionReports by db.MotionReportDao()
+        .observeAll()
+        .map { it.sortedBy { r -> r.date } }
         .collectAsState(initial = emptyList())
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -93,7 +87,7 @@ fun ReportsScreen(onBack: () -> Unit) {
                 .fillMaxSize()
                 .background(Color.White)
         ) {
-            // Header fixo
+            // Header
             Box(modifier = Modifier.fillMaxWidth().height(120.dp)) {
                 Image(
                     painter = painterResource(id = R.drawable.wave_green),
@@ -114,7 +108,7 @@ fun ReportsScreen(onBack: () -> Unit) {
                 }
             }
 
-            // Título e Tabs fixos
+            // Título + Tabs
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -160,7 +154,7 @@ fun ReportsScreen(onBack: () -> Unit) {
 
                 when (tab) {
                     ReportTab.Audio -> AudioReportSection(audioReports) { report, chartType ->
-                        selectedAudioReport = Pair(report, chartType)
+                        selectedAudioReport = report to chartType
                     }
                     ReportTab.Motion -> MotionReportSection(motionReports)
                 }
@@ -208,7 +202,13 @@ private fun SegmentedTabs(tab: ReportTab, onTab: (ReportTab) -> Unit) {
 }
 
 @Composable
-private fun SegButton(modifier: Modifier = Modifier, selected: Boolean, icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, onClick: () -> Unit) {
+private fun SegButton(
+    modifier: Modifier = Modifier,
+    selected: Boolean,
+    icon: ImageVector,
+    text: String,
+    onClick: () -> Unit
+) {
     val bg = if (selected) GreenDark else Color.Transparent
     val fg = if (selected) Color.White else OnBackground
     Row(
@@ -358,11 +358,14 @@ private fun DateFilterCard(
 }
 
 @Composable
-private fun AudioReportSection(items: List<AudioReportWithFiles>, onSelectReport: (AudioReportWithFiles, ChartType) -> Unit) {
+private fun AudioReportSection(
+    items: List<AudioReportWithFiles>,
+    onSelectReport: (AudioReportWithFiles, ChartType) -> Unit
+) {
     val pointsWpm = items.map { it.report.averageWordsPerMinute }
     val pointsWer = items.map { it.report.averageWordErrorRate }
     val labels = items.map { r ->
-        val date = r.files.minByOrNull { it.recordedAt }?.recordedAt
+        val date = r.files.minByOrNull { it.recordedAt ?: Instant.EPOCH }?.recordedAt
         if (date != null) {
             val localDate = LocalDateTime.ofInstant(date, ZoneId.systemDefault())
             DateTimeFormatter.ofPattern("dd/MM").format(localDate)
@@ -444,13 +447,14 @@ private fun AudioReportSection(items: List<AudioReportWithFiles>, onSelectReport
             Text("Últimos Testes Realizados", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
             Spacer(Modifier.height(12.dp))
             items.takeLast(5).reversed().forEachIndexed { idx, r ->
-                val date = r.files.minByOrNull { it.recordedAt }?.recordedAt
+                val date = r.files.minByOrNull { it.recordedAt ?: Instant.EPOCH }?.recordedAt
                 val label = if (date != null) {
                     val localDate = LocalDateTime.ofInstant(date, ZoneId.systemDefault())
                     DateTimeFormatter.ofPattern("dd/MM").format(localDate)
                 } else "#${idx + 1}"
                 Column(
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .background(Color(0xFFF5F5F5))
                         .padding(12.dp)
@@ -483,7 +487,6 @@ private fun AudioReportDetailDialog(
     chartType: ChartType,
     onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
     val attempts = remember(report.report.allTestsDescription) {
         parseAudioReportDetails(report.report.allTestsDescription)
     }
@@ -504,6 +507,7 @@ private fun AudioReportDetailDialog(
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.6f))
             .pointerInput(Unit) {
+                // click fora fecha
                 detectTapGestures { onDismiss() }
             }
     ) {
@@ -512,9 +516,7 @@ private fun AudioReportDetailDialog(
                 .fillMaxWidth()
                 .padding(24.dp)
                 .align(Alignment.Center)
-                .pointerInput(Unit) {
-                    detectTapGestures { }
-                },
+                .pointerInput(Unit) { /* captura toques internos */ },
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
@@ -609,60 +611,99 @@ private fun AudioReportDetailDialog(
                                     }
                                 }
                                 Spacer(Modifier.height(8.dp))
-                                if (currentlyPlayingIndex == idx) {
-                                    SimpleWaveform(modifier = Modifier.fillMaxWidth().height(60.dp))
+                                Text(
+                                    text = audioFile.fileName,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.Black
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = "Duração: ${(audioFile.audioDuration / 1000)}s",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GreenDark
+                                )
+                            }
+                        }
+                        if (idx < report.files.size - 1) Spacer(Modifier.height(8.dp))
+
+                        if (currentlyPlayingIndex == idx) {
+                            SimpleWaveform(modifier = Modifier.fillMaxWidth().height(60.dp))
+                            Spacer(Modifier.height(8.dp))
+                        }
+
+                        if (attempt != null && (attempt.phrase.isNotEmpty() || attempt.transcribed.isNotEmpty())) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color.White)
+                                    .padding(12.dp)
+                            ) {
+                                if (attempt.phrase.isNotEmpty()) {
+                                    Text(
+                                        "Esperado:",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black.copy(alpha = 0.6f)
+                                    )
+                                    Text(
+                                        attempt.phrase,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.Black
+                                    )
                                     Spacer(Modifier.height(8.dp))
                                 }
-
-                                if (attempt != null && (attempt.phrase.isNotEmpty() || attempt.transcribed.isNotEmpty())) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(Color.White)
-                                            .padding(12.dp)
-                                    ) {
-                                        if (attempt.phrase.isNotEmpty()) {
-                                            Text("Esperado:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black.copy(alpha = 0.6f))
-                                            Text(attempt.phrase, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
-                                            Spacer(Modifier.height(8.dp))
-                                        }
-                                        if (attempt.transcribed.isNotEmpty()) {
-                                            Text("Transcrito:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black.copy(alpha = 0.6f))
-                                            Text(attempt.transcribed, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = GreenDark)
-                                        }
-                                    }
-                                    Spacer(Modifier.height(8.dp))
+                                if (attempt.transcribed.isNotEmpty()) {
+                                    Text(
+                                        "Transcrito:",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black.copy(alpha = 0.6f)
+                                    )
+                                    Text(
+                                        attempt.transcribed,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = GreenDark
+                                    )
                                 }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                        }
 
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text("Duração", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
-                                        Text("${audioFile.audioDuration / 1000}s", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = GreenDark)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Duração", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
+                                Text(
+                                    "${audioFile.audioDuration / 1000}s",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GreenDark
+                                )
+                            }
+                            if (attempt != null) {
+                                when (chartType) {
+                                    ChartType.WPM -> {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("WPM", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
+                                            Text("${attempt.wpm}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = GreenDark)
+                                        }
                                     }
-                                    if (attempt != null) {
-                                        when (chartType) {
-                                            ChartType.WPM -> {
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text("WPM", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
-                                                    Text("${attempt.wpm}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = GreenDark)
-                                                }
-                                            }
-                                            ChartType.WER -> {
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text("WER", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
-                                                    Text("${String.format("%.1f", attempt.wer)}%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = GreenDark)
-                                                }
-                                            }
+                                    ChartType.WER -> {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("WER", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
+                                            Text("${String.format("%.1f", attempt.wer)}%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = GreenDark)
                                         }
                                     }
                                 }
                             }
                         }
-                        if (idx < filesSorted.size - 1) Spacer(Modifier.height(8.dp))
                     }
                 }
 
@@ -781,7 +822,8 @@ private fun MotionReportSection(items: List<com.recuperavc.models.MotionReport>)
                     val localDate = LocalDateTime.ofInstant(r.date, ZoneId.systemDefault())
                     val label = DateTimeFormatter.ofPattern("dd/MM").format(localDate)
                     Column(
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color(0xFFF5F5F5))
                             .padding(12.dp)
@@ -859,23 +901,53 @@ private fun ChartCard(title: String, subtitle: String, content: @Composable () -
     }
 }
 
+/**
+ * Gráfico de barras com rolagem horizontal + rótulos sincronizados
+ * e eixo Y fixo à esquerda. Clique por barra opcional.
+ */
 @Composable
-private fun BarChart(points: List<Float>, labels: List<String>, yAxisLabel: String, onBarClick: ((Int) -> Unit)?) {
-    val maxY = (points.maxOrNull() ?: 1f).coerceAtLeast(1f) * 1.2f
+private fun BarChart(
+    points: List<Float>,
+    labels: List<String>,
+    yAxisLabel: String? = null,
+    onBarClick: ((Int) -> Unit)?
+) {
+    if (points.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Sem dados", color = Color.Black.copy(alpha = 0.6f))
+        }
+        return
+    }
+
+    val maxY = (points.maxOrNull() ?: 1f).coerceAtLeast(1f)
     val minY = 0f
     val scrollState = rememberScrollState()
-    val barWidthDp = 80
+    val barWidthDp = 64 // ajuste fino do tamanho das barras
 
     Column(modifier = Modifier.fillMaxSize()) {
+
+        // Área principal: eixo Y fixo + barras com scroll
         Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
+
+            // Eixo Y
             Column(
-                modifier = Modifier.width(55.dp).fillMaxHeight(),
+                modifier = Modifier
+                    .width(48.dp)
+                    .fillMaxHeight(),
                 verticalArrangement = Arrangement.SpaceBetween,
                 horizontalAlignment = Alignment.End
             ) {
                 Column(horizontalAlignment = Alignment.End) {
+                    if (yAxisLabel != null) {
+                        Text(
+                            yAxisLabel,
+                            fontSize = 10.sp,
+                            color = Color.Black.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(end = 4.dp)
+                        )
+                    }
                     Text(
-                        text = "${maxY.toInt()}",
+                        "${maxY.toInt()}",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.Black,
@@ -883,28 +955,28 @@ private fun BarChart(points: List<Float>, labels: List<String>, yAxisLabel: Stri
                     )
                 }
                 Text(
-                    text = "${(maxY * 0.75f).toInt()}",
+                    "${(maxY * 0.75f).toInt()}",
                     fontSize = 9.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color.Black.copy(alpha = 0.6f),
                     modifier = Modifier.padding(end = 4.dp)
                 )
                 Text(
-                    text = "${(maxY * 0.5f).toInt()}",
+                    "${(maxY * 0.5f).toInt()}",
                     fontSize = 9.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color.Black.copy(alpha = 0.6f),
                     modifier = Modifier.padding(end = 4.dp)
                 )
                 Text(
-                    text = "${(maxY * 0.25f).toInt()}",
+                    "${(maxY * 0.25f).toInt()}",
                     fontSize = 9.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color.Black.copy(alpha = 0.6f),
                     modifier = Modifier.padding(end = 4.dp)
                 )
                 Text(
-                    text = "${minY.toInt()}",
+                    "${minY.toInt()}",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black,
@@ -912,31 +984,39 @@ private fun BarChart(points: List<Float>, labels: List<String>, yAxisLabel: Stri
                 )
             }
 
+            // Barras (scroll sincronizado com labels)
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
                     .horizontalScroll(scrollState)
             ) {
-                val totalWidth = points.size * barWidthDp
+                val totalWidth = (points.size * barWidthDp).dp
                 Row(
-                    modifier = Modifier.width(totalWidth.dp).fillMaxHeight(),
+                    modifier = Modifier
+                        .width(totalWidth)
+                        .fillMaxHeight(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     points.forEachIndexed { idx, value ->
+                        val ratio = if (maxY == minY) 0f
+                        else ((value - minY) / (maxY - minY)).coerceIn(0f, 1f)
+                        val safeRatio = if (ratio == 0f && points.isNotEmpty()) 0.03f else ratio
+
                         Box(
                             modifier = Modifier
                                 .width(barWidthDp.dp)
                                 .fillMaxHeight()
-                                .clickable { onBarClick?.invoke(idx) },
+                                .padding(horizontal = 8.dp)
+                                .clickable(enabled = onBarClick != null) {
+                                    onBarClick?.invoke(idx)
+                                },
                             contentAlignment = Alignment.BottomCenter
                         ) {
-                            val base = ((value - minY) / (maxY - minY)).coerceIn(0f, 1f)
-                            val barHeight = if (base == 0f && points.isNotEmpty()) 0.03f else base
                             Box(
                                 modifier = Modifier
-                                    .width(50.dp)
-                                    .fillMaxHeight(barHeight)
+                                    .width(28.dp)
+                                    .fillMaxHeight(safeRatio)
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(GreenDark)
                             )
@@ -948,18 +1028,18 @@ private fun BarChart(points: List<Float>, labels: List<String>, yAxisLabel: Stri
 
         Spacer(Modifier.height(8.dp))
 
+        // Rótulos (eixo X) — usam o mesmo scrollState das barras
         Row(modifier = Modifier.fillMaxWidth()) {
-            Spacer(Modifier.width(55.dp))
+            Spacer(Modifier.width(48.dp)) // compensar eixo Y
             Row(
                 modifier = Modifier
                     .weight(1f)
                     .horizontalScroll(scrollState)
-                    .background(Color.White)
                     .padding(vertical = 4.dp)
             ) {
-                val totalWidth = labels.size * barWidthDp
+                val totalWidth = (labels.size * barWidthDp).dp
                 Row(
-                    modifier = Modifier.width(totalWidth.dp),
+                    modifier = Modifier.width(totalWidth),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     labels.forEach { label ->
@@ -994,7 +1074,13 @@ private fun SimpleChip(text: String) {
     }
 }
 
-private data class Attempt(val fileId: String?, val phrase: String, val wpm: Int, val wer: Float, val transcribed: String = "")
+private data class Attempt(
+    val fileId: String?,
+    val phrase: String,
+    val wpm: Int,
+    val wer: Float,
+    val transcribed: String = ""
+)
 
 private fun parseAudioReportDetails(desc: String): List<Attempt> {
     return try {
@@ -1003,17 +1089,18 @@ private fun parseAudioReportDetails(desc: String): List<Attempt> {
         buildList {
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
-                val fid = o.optString("fileId", null)
-                add(Attempt(
-                    fileId = fid,
-                    phrase = o.optString("phrase"),
-                    wpm = o.optInt("wpm"),
-                    wer = o.optDouble("wer").toFloat(),
-                    transcribed = o.optString("transcribed", "")
-                ))
+                add(
+                    Attempt(
+                        fileId = o.optString("fileId", null),
+                        phrase = o.optString("phrase", ""),
+                        wpm = o.optInt("wpm", 0),
+                        wer = o.optDouble("wer", 0.0).toFloat(),
+                        transcribed = o.optString("transcribed", "")
+                    )
+                )
             }
         }
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         emptyList()
     }
 }

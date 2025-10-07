@@ -21,7 +21,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.recuperavc.data.CurrentUser
 import com.recuperavc.data.db.DbProvider
 import com.recuperavc.ui.theme.GreenDark
 import com.recuperavc.ui.theme.OnBackground
@@ -30,9 +29,9 @@ import com.recuperavc.ui.theme.OnBackground
 fun HistoryDialog(onDismiss: () -> Unit) {
     val context = LocalContext.current
     val db = remember(context) { DbProvider.db(context) }
-    val audioFiles by db.audioFileDao().observeForUser(CurrentUser.ID).collectAsState(initial = emptyList())
-    val audioReports by db.audioReportDao().observeForUser(CurrentUser.ID).collectAsState(initial = emptyList())
-    val coherenceReports by db.coherenceReportDao().observeForUser(CurrentUser.ID).collectAsState(initial = emptyList())
+    val audioFiles by db.audioFileDao().observeAll().collectAsState(initial = emptyList())
+    val audioReports by db.audioReportDao().observeAll().collectAsState(initial = emptyList())
+    val coherenceReports by db.coherenceReportDao().observeAll().collectAsState(initial = emptyList())
 
     AlertDialog(
         onDismissRequest = onDismiss,
