@@ -30,4 +30,7 @@ interface AudioReportDao {
 
     @Query("SELECT * FROM AudioReport")
     fun observeAll(): Flow<List<AudioReport>>
+
+    @Query("DELETE FROM AudioReport WHERE allTestsDescription NOT LIKE '{%' AND id IN (SELECT idAudioReport FROM AudioReportGroup GROUP BY idAudioReport HAVING COUNT(idAudioFile) <= 1)")
+    suspend fun deletePartialReports()
 }
