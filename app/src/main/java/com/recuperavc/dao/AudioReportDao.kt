@@ -24,6 +24,10 @@ interface AudioReportDao {
         }
     }
 
+    @Transaction
+    @Query("SELECT * FROM AudioReport")
+    fun observeAllWithFiles(): kotlinx.coroutines.flow.Flow<List<com.recuperavc.models.relations.AudioReportWithFiles>>
+
     @Query("SELECT * FROM AudioReport")
     fun observeAll(): Flow<List<AudioReport>>
 }

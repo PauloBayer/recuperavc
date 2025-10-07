@@ -26,7 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
-import com.recuperavc.data.CurrentUser
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.recuperavc.data.db.DbProvider
 import com.recuperavc.models.relations.AudioReportWithFiles
 import com.recuperavc.ui.theme.BackgroundGreen
@@ -36,6 +36,7 @@ import com.recuperavc.ui.theme.OnBackground
 import kotlinx.coroutines.flow.map
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.Instant
 
 @Composable
 fun ReportsScreen(onBack: () -> Unit) {
@@ -45,10 +46,19 @@ fun ReportsScreen(onBack: () -> Unit) {
     var tab by remember { mutableStateOf(ReportTab.Audio) }
     var selectedAudioReport by remember { mutableStateOf<AudioReportWithFiles?>(null) }
 
-    val audioReports by db.audioReportDao().observeWithFilesForUser(CurrentUser.ID)
-        .map { it.sortedBy { rep -> rep.files.minOfOrNull { f -> f.recordedAt } } }
+    // 🔁 No more per-user filters — observe ALL with files
+    val audioReports by db.audioReportDao()
+        .observeAllWithFiles()
+        .map { list ->
+            list.sortedBy { rep ->
+                // sort by earliest recordedAt among files; default to epoch if null/empty
+                rep.files.minOfOrNull { it.recordedAt ?: Instant.EPOCH } ?: Instant.EPOCH
+            }
+        }
         .collectAsState(initial = emptyList())
-    val motionReports by db.MotionReportDao().observeForUser(CurrentUser.ID)
+
+    val motionReports by db.MotionReportDao()
+        .observeAll()
         .map { it.sortedBy { r -> r.date } }
         .collectAsState(initial = emptyList())
 
@@ -155,7 +165,13 @@ private fun SegmentedTabs(tab: ReportTab, onTab: (ReportTab) -> Unit) {
 }
 
 @Composable
-private fun SegButton(modifier: Modifier = Modifier, selected: Boolean, icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, onClick: () -> Unit) {
+private fun SegButton(
+    modifier: Modifier = Modifier,
+    selected: Boolean,
+    icon: ImageVector,
+    text: String,
+    onClick: () -> Unit
+) {
     val bg = if (selected) GreenDark else Color.Transparent
     val fg = if (selected) Color.White else OnBackground
     Row(
@@ -174,11 +190,14 @@ private fun SegButton(modifier: Modifier = Modifier, selected: Boolean, icon: an
 }
 
 @Composable
-private fun AudioReportSection(items: List<AudioReportWithFiles>, onSelectReport: (AudioReportWithFiles) -> Unit) {
+private fun AudioReportSection(
+    items: List<AudioReportWithFiles>,
+    onSelectReport: (AudioReportWithFiles) -> Unit
+) {
     val pointsWpm = items.map { it.report.averageWordsPerMinute }
     val pointsAcc = items.map { 100f - it.report.averageWordErrorRate }
     val labels = items.map { r ->
-        val date = r.files.minByOrNull { it.recordedAt }?.recordedAt
+        val date = r.files.minByOrNull { it.recordedAt ?: Instant.EPOCH }?.recordedAt
         if (date != null) {
             val localDate = java.time.LocalDateTime.ofInstant(date, ZoneId.systemDefault())
             DateTimeFormatter.ofPattern("dd/MM").format(localDate)
@@ -228,7 +247,7 @@ private fun AudioReportSection(items: List<AudioReportWithFiles>, onSelectReport
             Text("Últimos Testes Realizados", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
             Spacer(Modifier.height(12.dp))
             items.takeLast(5).reversed().forEachIndexed { idx, r ->
-                val date = r.files.minByOrNull { it.recordedAt }?.recordedAt
+                val date = r.files.minByOrNull { it.recordedAt ?: Instant.EPOCH }?.recordedAt
                 val label = if (date != null) {
                     val localDate = java.time.LocalDateTime.ofInstant(date, ZoneId.systemDefault())
                     DateTimeFormatter.ofPattern("dd/MM").format(localDate)
@@ -297,7 +316,7 @@ private fun AudioReportDetailDialog(report: AudioReportWithFiles, onDismiss: () 
                     color = Color.Black
                 )
                 Spacer(Modifier.height(4.dp))
-                val date = report.files.minByOrNull { it.recordedAt }?.recordedAt
+                val date = report.files.minByOrNull { it.recordedAt ?: Instant.EPOCH }?.recordedAt
                 if (date != null) {
                     val localDate = java.time.LocalDateTime.ofInstant(date, ZoneId.systemDefault())
                     Text(
@@ -352,7 +371,7 @@ private fun AudioReportDetailDialog(report: AudioReportWithFiles, onDismiss: () 
                                 )
                                 Spacer(Modifier.height(4.dp))
                                 Text(
-                                    text = "Duração: ${audioFile.audioDuration / 1000}s",
+                                    text = "Duração: ${(audioFile.audioDuration / 1000)}s",
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = GreenDark
@@ -497,9 +516,7 @@ private fun BarChart(points: List<Float>, labels: List<String>, onBarClick: ((In
                         Modifier.pointerInput(Unit) {
                             detectTapGestures { pos ->
                                 barRects.forEachIndexed { idx, rect ->
-                                    if (rect.contains(pos)) {
-                                        onBarClick(idx)
-                                    }
+                                    if (rect.contains(pos)) onBarClick(idx)
                                 }
                             }
                         }
@@ -586,14 +603,16 @@ private fun parseAudioReportDetails(desc: String): List<Attempt> {
         buildList {
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
-                add(Attempt(
-                    phrase = o.optString("phrase"),
-                    wpm = o.optInt("wpm"),
-                    wer = o.optDouble("wer").toFloat()
-                ))
+                add(
+                    Attempt(
+                        phrase = o.optString("phrase"),
+                        wpm = o.optInt("wpm"),
+                        wer = o.optDouble("wer").toFloat()
+                    )
+                )
             }
         }
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         emptyList()
     }
 }

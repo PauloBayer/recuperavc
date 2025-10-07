@@ -128,10 +128,9 @@ fun MotionTestScreen(
                 }
 
                 // Cálculo correto por minuto baseado na duração efetiva
-                val clicksPerMinute = if (effectiveDuration > 0f)
-                    (clicks / effectiveDuration).toInt()
-                else
-                    clicks
+                val clicksPerMinute = if (effectiveDuration > 0) {
+                    ((clicks * 60.0) / effectiveDuration).roundToInt()
+                } else 0
 
                 // Persistir com o novo modelo
                 val report = MotionReport(
