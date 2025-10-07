@@ -66,6 +66,7 @@ fun HomeScreen(
     onOpenAudioTest: () -> Unit,
     onOpenMotionTest: () -> Unit,
     onOpenReports: () -> Unit = {},
+    onOpenSettings: () -> Unit,
     onExit: () -> Unit
 ) {
     val drawerState: DrawerState = rememberDrawerState(DrawerValue.Closed)
@@ -120,7 +121,7 @@ fun HomeScreen(
                 NavigationDrawerItem(
                     label = { Text("Preferências do App") },
                     selected = false,
-                    onClick = {},
+                    onClick = { onOpenSettings(); scope.launch { drawerState.close() } },
                     icon = { Icon(Icons.Default.Settings, contentDescription = null) },
                     colors = NavigationDrawerItemDefaults.colors(
                         selectedContainerColor = Color.White.copy(alpha = 0.16f),
@@ -131,20 +132,20 @@ fun HomeScreen(
                         unselectedIconColor = Color.White
                     )
                 )
-                NavigationDrawerItem(
-                    label = { Text("Editar Perfil") },
-                    selected = false,
-                    onClick = {},
-                    icon = { Icon(Icons.Default.AccountCircle, contentDescription = null) },
-                    colors = NavigationDrawerItemDefaults.colors(
-                        selectedContainerColor = Color.White.copy(alpha = 0.16f),
-                        unselectedContainerColor = Color.Transparent,
-                        selectedTextColor = Color.White,
-                        unselectedTextColor = Color.White,
-                        selectedIconColor = Color.White,
-                        unselectedIconColor = Color.White
-                    )
-                )
+//                NavigationDrawerItem(
+//                    label = { Text("Editar Perfil") },
+//                    selected = false,
+//                    onClick = {},
+//                    icon = { Icon(Icons.Default.AccountCircle, contentDescription = null) },
+//                    colors = NavigationDrawerItemDefaults.colors(
+//                        selectedContainerColor = Color.White.copy(alpha = 0.16f),
+//                        unselectedContainerColor = Color.Transparent,
+//                        selectedTextColor = Color.White,
+//                        unselectedTextColor = Color.White,
+//                        selectedIconColor = Color.White,
+//                        unselectedIconColor = Color.White
+//                    )
+//                )
             }
         }
     ) {
