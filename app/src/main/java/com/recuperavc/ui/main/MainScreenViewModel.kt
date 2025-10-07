@@ -27,8 +27,7 @@ import com.recuperavc.models.AudioFile
 import com.recuperavc.models.AudioReport
 import com.recuperavc.models.Phrase
 import com.recuperavc.models.enums.PhraseType
-import com.recuperavc.models.CoherenceReport
-import com.recuperavc.models.CoherenceReportGroup
+ 
 import java.time.Instant
 import java.util.UUID
 import kotlinx.coroutines.delay
@@ -254,24 +253,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
 
             
 
-            // 3) CoherenceReport
             sessionCount = sessionItems.size
-
-            val coherenceId = UUID.randomUUID()
-            val coherence = CoherenceReport(
-                id = coherenceId,
-                averageErrorsPerTry = analysis.wer.toFloat(),
-                averageTimePerTry = recordingDurationMs / 1000.0f,
-                allTestsDescription = "score=${String.format("%.1f", 100 - analysis.wer)};expected=$phraseText;transcribed=$transcribedText",
-                phraseId = phraseId
-            )
-            db.coherenceReportDao().upsert(coherence)
-            db.coherenceReportDao().link(
-                CoherenceReportGroup(
-                    idPhrase = phraseId,
-                    idCoherenceReport = coherenceId
-                )
-            )
         }
     }
 
