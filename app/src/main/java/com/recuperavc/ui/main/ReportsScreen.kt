@@ -67,19 +67,32 @@ fun ReportsScreen(onBack: () -> Unit) {
     var endDate by remember { mutableStateOf(now) }
     var isDateManuallySet by remember { mutableStateOf(false) }
 
-    val audioReports by db.audioReportDao()
+    val rawAudioReports by db.audioReportDao()
         .observeAllWithFiles()
         .map { list ->
-            list.sortedBy { rep ->
-                rep.files.minOfOrNull { it.recordedAt ?: Instant.EPOCH } ?: Instant.EPOCH
-            }
+            list.filter { parseAudioReportDetails(it.report.allTestsDescription).isNotEmpty() }
         }
         .collectAsState(initial = emptyList())
 
-    val motionReports by db.MotionReportDao()
+    val audioReports = remember(rawAudioReports, startDate, endDate) {
+        rawAudioReports
+            .filter { rep ->
+                val minDate = rep.files.minOfOrNull { it.recordedAt ?: Instant.EPOCH } ?: Instant.EPOCH
+                minDate >= startDate && minDate <= endDate
+            }
+            .sortedBy { rep ->
+                rep.files.minOfOrNull { it.recordedAt ?: Instant.EPOCH } ?: Instant.EPOCH
+            }
+    }
+
+    val rawMotionReports by db.MotionReportDao()
         .observeAll()
         .map { it.sortedBy { r -> r.date } }
         .collectAsState(initial = emptyList())
+
+    val motionReports = remember(rawMotionReports, startDate, endDate) {
+        rawMotionReports.filter { it.date >= startDate && it.date <= endDate }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -386,22 +399,15 @@ private fun AudioReportSection(
                 Icon(
                     Icons.Default.Mic,
                     contentDescription = null,
-                    tint = OnBackground.copy(alpha = 0.3f),
+                    tint = Color.Black.copy(alpha = 0.3f),
                     modifier = Modifier.size(64.dp)
                 )
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    text = "Nenhum dado disponível",
+                    text = "Nenhum relatório encontrado",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OnBackground.copy(alpha = 0.6f),
-                    textAlign = TextAlign.Center
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = "Nenhum teste de voz encontrado no período selecionado",
-                    fontSize = 14.sp,
-                    color = OnBackground.copy(alpha = 0.5f),
+                    color = Color.Black.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center
                 )
             }
@@ -781,22 +787,15 @@ private fun MotionReportSection(items: List<com.recuperavc.models.MotionReport>)
                 Icon(
                     Icons.Default.Gesture,
                     contentDescription = null,
-                    tint = OnBackground.copy(alpha = 0.3f),
+                    tint = Color.Black.copy(alpha = 0.3f),
                     modifier = Modifier.size(64.dp)
                 )
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    text = "Nenhum dado disponível",
+                    text = "Nenhum relatório encontrado",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OnBackground.copy(alpha = 0.6f),
-                    textAlign = TextAlign.Center
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = "Nenhum teste de coordenação encontrado no período selecionado",
-                    fontSize = 14.sp,
-                    color = OnBackground.copy(alpha = 0.5f),
+                    color = Color.Black.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center
                 )
             }
