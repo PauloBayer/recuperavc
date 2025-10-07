@@ -18,4 +18,7 @@ interface CoherenceReportDao {
 
     @Query("SELECT * FROM CoherenceReport WHERE fk_User_id = :userId")
     fun observeForUser(userId: Int): Flow<List<CoherenceReport>>
+
+    @Query("SELECT * FROM CoherenceReport WHERE fk_Phrase_id = :phraseId")
+    suspend fun getByPhraseId(phraseId: UUID): List<CoherenceReport>
 }
