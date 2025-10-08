@@ -36,7 +36,6 @@ class SfxController internal constructor(
         if (id in loadedIds.value) {
             soundPool.play(id, volume, volume, /*priority*/1, if (loop) -1 else 0, rate)
         }
-        // If you want to play even if not yet loaded, you could enqueue logic here.
     }
 
     fun release() = soundPool.release()
@@ -57,44 +56,47 @@ class SfxController internal constructor(
 fun rememberSfxController(maxStreams: Int = 8): SfxController {
     val context = LocalContext.current
 
-    // Keep a single SoundPool instance for this composition
-    val soundPool = remember {
-        SoundPool.Builder()
+    val controller = remember {
+        val attrs = android.media.AudioAttributes.Builder()
+            .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+
+        val soundPool = SoundPool.Builder()
+            .setAudioAttributes(attrs)
             .setMaxStreams(maxStreams)
             .build()
-    }
 
-    // Track which sounds have finished loading (SoundPool loads async)
-    val loaded = remember { mutableStateOf(emptySet<Int>()) }
+        val loaded = mutableStateOf(emptySet<Int>())
+        val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
-    // Preload everything once
-    val ids = remember {
-        val map = linkedMapOf<Sfx, Int>()
-        map[Sfx.CLICK]            = soundPool.load(context, R.raw.short_pop,         1)
-        map[Sfx.START_RECORDING]  = soundPool.load(context, R.raw.start_recording,   1)
-        map[Sfx.STOP_RECORDING]   = soundPool.load(context, R.raw.stop_recording,    1)
-        map[Sfx.PROCESSING_DONE]  = soundPool.load(context, R.raw.processing_done,   1)
-        map[Sfx.RIGHT_ANSWER]     = soundPool.load(context, R.raw.right_answer,      1)
-        map[Sfx.WRONG_ANSWER]     = soundPool.load(context, R.raw.wrong_answer,      1)
-        map[Sfx.BUBBLE]           = soundPool.load(context, R.raw.bubble_pop,        1)
-        map
-    }
-
-    // When each file finishes loading, mark it as ready
-    DisposableEffect(soundPool) {
-        val listener = SoundPool.OnLoadCompleteListener { _, sampleId, status ->
+        soundPool.setOnLoadCompleteListener { _, sampleId, status ->
             if (status == 0) {
-                loaded.value = loaded.value + sampleId
+                // Ensure we touch Compose state on main
+                mainHandler.post {
+                    loaded.value = loaded.value + sampleId
+                }
             }
         }
-        soundPool.setOnLoadCompleteListener(listener)
-        onDispose {
-            soundPool.setOnLoadCompleteListener(null)
-            soundPool.release()
+
+        val ids = linkedMapOf<Sfx, Int>().apply {
+            put(Sfx.CLICK,           soundPool.load(context, R.raw.short_pop,        1))
+            put(Sfx.START_RECORDING, soundPool.load(context, R.raw.start_recording,  1))
+            put(Sfx.STOP_RECORDING,  soundPool.load(context, R.raw.stop_recording,   1))
+            put(Sfx.PROCESSING_DONE, soundPool.load(context, R.raw.processing_done,  1))
+            put(Sfx.RIGHT_ANSWER,    soundPool.load(context, R.raw.right_answer,     1))
+            put(Sfx.WRONG_ANSWER,    soundPool.load(context, R.raw.wrong_answer,     1))
+            put(Sfx.BUBBLE,          soundPool.load(context, R.raw.bubble_pop,       1))
         }
+
+        SfxController(soundPool, ids, loaded)
     }
 
-    return remember { SfxController(soundPool, ids, loaded) }
+    DisposableEffect(controller) {
+        onDispose { controller.release() }
+    }
+
+    return controller
 }
 
 /** Helper to add SFX to any onClick lambda. */

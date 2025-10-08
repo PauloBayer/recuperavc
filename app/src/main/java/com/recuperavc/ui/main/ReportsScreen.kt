@@ -50,6 +50,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Calendar
+import com.recuperavc.ui.sfx.Sfx
+import com.recuperavc.ui.sfx.rememberSfxController
 
 enum class ChartType { WPM, WER }
 
@@ -57,6 +59,7 @@ enum class ChartType { WPM, WER }
 fun ReportsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val db = remember(context) { DbProvider.db(context) }
+    val sfx = rememberSfxController() // short_pop on every tap
 
     var tab by remember { mutableStateOf(ReportTab.Audio) }
     var selectedAudioReport by remember { mutableStateOf<Pair<AudioReportWithFiles, ChartType>?>(null) }
@@ -115,7 +118,7 @@ fun ReportsScreen(onBack: () -> Unit) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Top
                 ) {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { sfx.play(Sfx.CLICK); onBack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = null, tint = OnBackground)
                     }
                 }
@@ -138,7 +141,13 @@ fun ReportsScreen(onBack: () -> Unit) {
                     textAlign = TextAlign.Center
                 )
                 Spacer(Modifier.height(12.dp))
-                SegmentedTabs(tab = tab, onTab = { tab = it })
+                SegmentedTabs(
+                    tab = tab,
+                    onTab = {
+                        sfx.play(Sfx.CLICK)
+                        tab = it
+                    }
+                )
                 Spacer(Modifier.height(16.dp))
             }
 
@@ -161,14 +170,17 @@ fun ReportsScreen(onBack: () -> Unit) {
                     onEndDateChange = {
                         endDate = it
                         isDateManuallySet = true
-                    }
+                    },
+                    onTapSound = { sfx.play(Sfx.CLICK) } // abre date pickers
                 )
                 Spacer(Modifier.height(16.dp))
 
                 when (tab) {
-                    ReportTab.Audio -> AudioReportSection(audioReports) { report, chartType ->
-                        selectedAudioReport = report to chartType
-                    }
+                    ReportTab.Audio -> AudioReportSection(
+                        items = audioReports,
+                        onSelectReport = { report, chartType -> selectedAudioReport = report to chartType },
+                        onBarTapSound = { sfx.play(Sfx.CLICK) } // toque na barra
+                    )
                     ReportTab.Motion -> MotionReportSection(motionReports)
                 }
             }
@@ -178,7 +190,8 @@ fun ReportsScreen(onBack: () -> Unit) {
             AudioReportDetailDialog(
                 report = rep,
                 chartType = chartType,
-                onDismiss = { selectedAudioReport = null }
+                onDismiss = { selectedAudioReport = null },
+                onAnyTap = { sfx.play(Sfx.CLICK) } // fundo, play/pause, fechar
             )
         }
     }
@@ -245,7 +258,8 @@ private fun DateFilterCard(
     endDate: Instant,
     isManuallySet: Boolean,
     onStartDateChange: (Instant) -> Unit,
-    onEndDateChange: (Instant) -> Unit
+    onEndDateChange: (Instant) -> Unit,
+    onTapSound: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -286,6 +300,7 @@ private fun DateFilterCard(
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color(0xFFF5F5F5))
                             .clickable {
+                                onTapSound()
                                 val cal = Calendar.getInstance()
                                 val localDateTime = LocalDateTime.ofInstant(startDate, ZoneId.systemDefault())
                                 cal.set(localDateTime.year, localDateTime.monthValue - 1, localDateTime.dayOfMonth)
@@ -330,6 +345,7 @@ private fun DateFilterCard(
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color(0xFFF5F5F5))
                             .clickable {
+                                onTapSound()
                                 val cal = Calendar.getInstance()
                                 val localDateTime = LocalDateTime.ofInstant(endDate, ZoneId.systemDefault())
                                 cal.set(localDateTime.year, localDateTime.monthValue - 1, localDateTime.dayOfMonth)
@@ -373,7 +389,8 @@ private fun DateFilterCard(
 @Composable
 private fun AudioReportSection(
     items: List<AudioReportWithFiles>,
-    onSelectReport: (AudioReportWithFiles, ChartType) -> Unit
+    onSelectReport: (AudioReportWithFiles, ChartType) -> Unit,
+    onBarTapSound: () -> Unit
 ) {
     val pointsWpm = items.map { it.report.averageWordsPerMinute }
     val pointsWer = items.map { it.report.averageWordErrorRate }
@@ -430,7 +447,8 @@ private fun AudioReportSection(
             points = pointsWpm,
             labels = labels,
             yAxisLabel = "WPM",
-            onBarClick = { idx -> items.getOrNull(idx)?.let { onSelectReport(it, ChartType.WPM) } }
+            onBarClick = { idx -> items.getOrNull(idx)?.let { onSelectReport(it, ChartType.WPM) } },
+            onBarTapSound = onBarTapSound
         )
     }
     Spacer(Modifier.height(16.dp))
@@ -439,7 +457,8 @@ private fun AudioReportSection(
             points = pointsWer,
             labels = labels,
             yAxisLabel = "WER (%)",
-            onBarClick = { idx -> items.getOrNull(idx)?.let { onSelectReport(it, ChartType.WER) } }
+            onBarClick = { idx -> items.getOrNull(idx)?.let { onSelectReport(it, ChartType.WER) } },
+            onBarTapSound = onBarTapSound
         )
     }
     Spacer(Modifier.height(16.dp))
@@ -491,7 +510,8 @@ private fun AudioReportSection(
 private fun AudioReportDetailDialog(
     report: AudioReportWithFiles,
     chartType: ChartType,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onAnyTap: () -> Unit
 ) {
     val attempts = remember(report.report.allTestsDescription) {
         parseAudioReportDetails(report.report.allTestsDescription)
@@ -514,7 +534,10 @@ private fun AudioReportDetailDialog(
             .background(Color.Black.copy(alpha = 0.6f))
             .pointerInput(Unit) {
                 // click fora fecha
-                detectTapGestures { onDismiss() }
+                detectTapGestures {
+                    onAnyTap()
+                    onDismiss()
+                }
             }
     ) {
         Card(
@@ -585,6 +608,7 @@ private fun AudioReportDetailDialog(
                                     )
                                     IconButton(
                                         onClick = {
+                                            onAnyTap()
                                             if (currentlyPlayingIndex == idx) {
                                                 mediaPlayer?.stop()
                                                 mediaPlayer?.release()
@@ -716,6 +740,7 @@ private fun AudioReportDetailDialog(
                 Spacer(Modifier.height(20.dp))
                 Button(
                     onClick = {
+                        onAnyTap()
                         mediaPlayer?.stop()
                         mediaPlayer?.release()
                         mediaPlayer = null
@@ -909,7 +934,8 @@ private fun BarChart(
     points: List<Float>,
     labels: List<String>,
     yAxisLabel: String? = null,
-    onBarClick: ((Int) -> Unit)?
+    onBarClick: ((Int) -> Unit)?,
+    onBarTapSound: (() -> Unit)? = null
 ) {
     if (points.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1008,6 +1034,7 @@ private fun BarChart(
                                 .fillMaxHeight()
                                 .padding(horizontal = 8.dp)
                                 .clickable(enabled = onBarClick != null) {
+                                    onBarTapSound?.invoke()
                                     onBarClick?.invoke(idx)
                                 },
                             contentAlignment = Alignment.BottomCenter

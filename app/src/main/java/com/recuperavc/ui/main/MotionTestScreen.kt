@@ -31,6 +31,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 import kotlin.random.Random
+import com.recuperavc.ui.sfx.Sfx
+import com.recuperavc.ui.sfx.rememberSfxController
 
 private enum class MotionMode { MOVING, STATIC }
 private enum class Hand { RIGHT, LEFT }
@@ -44,6 +46,8 @@ fun MotionTestScreen(
     onFinish: (Int) -> Unit = {},
     onBack: () -> Unit = {}
 ) {
+    val sfx = rememberSfxController()
+
     BackHandler(enabled = true) { onBack() }
 
     val context = LocalContext.current
@@ -263,7 +267,10 @@ fun MotionTestScreen(
 
                 val canStart = selectedHand != null && isDominant != null && chosenMode != null
                 Button(
-                    onClick = { testStarted = true },
+                    onClick = {
+                        sfx.play(Sfx.CLICK) // short pop ao iniciar
+                        testStarted = true
+                    },
                     enabled = canStart,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (canStart) GreenDark else Color(0xFF9E9E9E)
@@ -273,7 +280,10 @@ fun MotionTestScreen(
 
                 Spacer(Modifier.height(12.dp))
                 OutlinedButton(
-                    onClick = onBack,
+                    onClick = {
+                        sfx.play(Sfx.CLICK) // feedback no voltar
+                        onBack()
+                    },
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Voltar") }
             }
@@ -295,6 +305,7 @@ fun MotionTestScreen(
                 Button(
                     onClick = {
                         clicks++
+                        sfx.play(Sfx.BUBBLE)   // bubble pop no modo com movimento
                         moveButtonRandomly()
                     },
                     modifier = Modifier.size(movingButtonSize),
@@ -316,7 +327,10 @@ fun MotionTestScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Button(
-                    onClick = { clicks++ },
+                    onClick = {
+                        clicks++
+                        sfx.play(Sfx.CLICK)    // short pop no modo sem movimento
+                    },
                     modifier = Modifier.size(staticButtonSize),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = GreenAccent,
@@ -358,6 +372,7 @@ fun MotionTestScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(
                         onClick = {
+                            sfx.play(Sfx.CLICK)
                             // Reset total para novo teste
                             selectedHand = null
                             isDominant = null
@@ -372,7 +387,10 @@ fun MotionTestScreen(
                     ) { Text("Novo teste", color = Color.White) }
 
                     Button(
-                        onClick = onBack,
+                        onClick = {
+                            sfx.play(Sfx.CLICK)
+                            onBack()
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
                     ) { Text("Voltar", color = Color.White) }
                 }
@@ -402,7 +420,7 @@ private fun ReportCard(report: MotionReport) {
             Text("Cliques por minuto: ${report.clicksPerMinute}", fontSize = 14.sp, color = Color.Black)
             Text("Cliques errados: ${report.missedClicks}", fontSize = 14.sp, color = Color.Black)
             Spacer(Modifier.height(8.dp))
-            // Novos atributos
+            // Atributos do teste
             Text(
                 "Mão usada: ${if (report.withRightHand) "Direita" else "Esquerda"}",
                 fontSize = 14.sp,

@@ -22,6 +22,8 @@ import com.recuperavc.ui.theme.GreenDark
 import com.recuperavc.ui.theme.GreenLight
 import com.recuperavc.ui.theme.OnBackground
 import kotlin.math.roundToInt
+import com.recuperavc.ui.sfx.Sfx
+import com.recuperavc.ui.sfx.rememberSfxController
 
 @Composable
 fun SettingsScreen(
@@ -29,6 +31,8 @@ fun SettingsScreen(
     // Deixando aqui algumas configs para serem usadas para quando tiver a lógica
     onApply: (darkMode: Boolean, highContrast: Boolean, fontScale: Float) -> Unit = { _, _, _ -> }
 ) {
+    val sfx = rememberSfxController()
+
     var darkMode by remember { mutableStateOf(false) }
     var highContrast by remember { mutableStateOf(false) }
     var fontScale by remember { mutableStateOf(1.0f) }
@@ -64,7 +68,7 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.Start,
                 verticalAlignment = Alignment.Top
             ) {
-                IconButton(onClick = onBack) {
+                IconButton(onClick = { sfx.play(Sfx.CLICK); onBack() }) {
                     Icon(Icons.Default.ArrowBack, contentDescription = null, tint = OnBackground)
                 }
             }
@@ -100,7 +104,10 @@ fun SettingsScreen(
                         title = "Modo escuro",
                         subtitle = "Usa um tema com fundo escuro",
                         checked = darkMode,
-                        onCheckedChange = { darkMode = it }
+                        onCheckedChange = {
+                            sfx.play(Sfx.CLICK)
+                            darkMode = it
+                        }
                     )
 
                     Spacer(Modifier.height(12.dp))
@@ -109,7 +116,10 @@ fun SettingsScreen(
                         title = "Alto contraste",
                         subtitle = "Melhora a legibilidade com maior contraste",
                         checked = highContrast,
-                        onCheckedChange = { highContrast = it }
+                        onCheckedChange = {
+                            sfx.play(Sfx.CLICK)
+                            highContrast = it
+                        }
                     )
                 }
             }
@@ -142,19 +152,29 @@ fun SettingsScreen(
                             value = fontScale,
                             onValueChange = { fontScale = it.coerceIn(0.8f, 1.6f) },
                             valueRange = 0.8f..1.6f,
-                            steps = 7 // Para dar mais opções pro usuário, podemos só alterar essa parte aqui
+                            steps = 7,
+                            onValueChangeFinished = { sfx.play(Sfx.CLICK) }
                         )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            TextButton(onClick = { fontScale = (fontScale - 0.1f).coerceIn(0.8f, 1.6f) }) {
+                            TextButton(onClick = {
+                                sfx.play(Sfx.CLICK)
+                                fontScale = (fontScale - 0.1f).coerceIn(0.8f, 1.6f)
+                            }) {
                                 Text("A-", color = GreenDark, fontWeight = FontWeight.Bold)
                             }
-                            TextButton(onClick = { fontScale = 1.0f }) {
+                            TextButton(onClick = {
+                                sfx.play(Sfx.CLICK)
+                                fontScale = 1.0f
+                            }) {
                                 Text("Padrão", color = GreenDark, fontWeight = FontWeight.Bold)
                             }
-                            TextButton(onClick = { fontScale = (fontScale + 0.1f).coerceIn(0.8f, 1.6f) }) {
+                            TextButton(onClick = {
+                                sfx.play(Sfx.CLICK)
+                                fontScale = (fontScale + 0.1f).coerceIn(0.8f, 1.6f)
+                            }) {
                                 Text("A+", color = GreenDark, fontWeight = FontWeight.Bold)
                             }
                         }
@@ -203,14 +223,18 @@ fun SettingsScreen(
             // Ações do footer
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(
-                    onClick = onBack,
+                    onClick = { sfx.play(Sfx.CLICK); onBack() },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text("Voltar")
                 }
                 Button(
-                    onClick = { onApply(darkMode, highContrast, fontScale); onBack() },
+                    onClick = {
+                        sfx.play(Sfx.CLICK)
+                        onApply(darkMode, highContrast, fontScale)
+                        onBack()
+                    },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
