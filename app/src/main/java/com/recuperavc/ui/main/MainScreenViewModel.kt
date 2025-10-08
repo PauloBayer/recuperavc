@@ -1,5 +1,8 @@
 package com.recuperavc.ui.main
 
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import android.app.Application
 import android.content.Context
 import android.media.MediaPlayer
@@ -16,6 +19,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.recuperavc.media.decodeWaveFile
 import com.recuperavc.recorder.Recorder
+import com.recuperavc.ui.sfx.Sfx
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -54,6 +58,9 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         private set
     var analysisResult by mutableStateOf<AnalysisResult?>(null)
         private set
+
+    private val _sfx = MutableSharedFlow<Sfx>(extraBufferCapacity = 8)
+    val sfx: SharedFlow<Sfx> = _sfx.asSharedFlow()
 
     var phraseText by mutableStateOf("")
         private set
@@ -179,6 +186,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                     transcriptionResult = cleanText
                     analysisResult = analysis
                     isProcessing = false
+                    _sfx.tryEmit(Sfx.PROCESSING_DONE) // Finished processing
                 }
                 if (analysis != null) {
                     persistResults(file, recordingDurationMs, cleanText, analysis)
@@ -191,6 +199,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
             withContext(Dispatchers.Main) {
                 isProcessing = false
             }
+            _sfx.tryEmit(Sfx.WRONG_ANSWER)
             restoreProcessPriority()
         }
 
@@ -198,6 +207,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
             delay(800)
             clearResults()
             loadNewPhrase()
+            _sfx.tryEmit(Sfx.CLICK)
         }
         canTranscribe = true
     }
@@ -298,8 +308,10 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                 database.audioReportDao().insertWithFiles(report, snapshot.map { it.audioId })
                 val items = snapshot.map { SessionSummaryItem(it.phraseText, it.wpm, it.wer) }
                 sessionSummary = SessionSummary(avgWpm, avgWer, items)
+                _sfx.tryEmit(Sfx.RIGHT_ANSWER) // Salvo
                 true
             } else {
+                _sfx.tryEmit(Sfx.WRONG_ANSWER) // Não terminou
                 false
             }
             sessionItems.clear()
@@ -321,6 +333,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
 
     fun cancelRecording() {
         viewModelScope.launch {
+            _sfx.tryEmit(Sfx.STOP_RECORDING)
             isCancelling = true
             recorder.stopRecording()
             isRecording = false
@@ -332,6 +345,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         try {
             if (isRecording) {
                 recorder.stopRecording()
+                _sfx.tryEmit(Sfx.STOP_RECORDING) // Finished recording
                 isRecording = false
                 val recordingDuration = System.currentTimeMillis() - recordingStartTime
                 recordedFile?.let { transcribeAudio(it, recordingDuration) }
@@ -340,10 +354,15 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                 transcriptionResult = ""
                 analysisResult = null
                 val file = getTempFileForRecording()
+
+                // Starting to record
+                _sfx.tryEmit(Sfx.START_RECORDING)
+
                 recorder.startRecording(file, { e ->
                     viewModelScope.launch {
                         withContext(Dispatchers.Main) {
                             isRecording = false
+                            _sfx.tryEmit(Sfx.WRONG_ANSWER)     // Error starting
                         }
                     }
                 }) { shouldProcess ->
@@ -352,9 +371,12 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                             recorder.stopRecording()
                             isRecording = false
                             if (shouldProcess) {
+                                _sfx.tryEmit(Sfx.STOP_RECORDING)  // Stop before processing
                                 val recordingDuration = System.currentTimeMillis() - recordingStartTime
                                 recordedFile?.let { transcribeAudio(it, recordingDuration) }
                             } else {
+                                // Silence detected, não gravou nada
+                                _sfx.tryEmit(Sfx.WRONG_ANSWER)
                                 Log.d(LOG_TAG, "Gravação cancelada - nenhum áudio detectado")
                             }
                         }
@@ -366,6 +388,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
             }
         } catch (e: Exception) {
             Log.w(LOG_TAG, e)
+            _sfx.tryEmit(Sfx.WRONG_ANSWER) // Generic error
             isRecording = false
         }
     }

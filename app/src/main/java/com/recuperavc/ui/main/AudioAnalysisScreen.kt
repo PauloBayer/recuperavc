@@ -38,9 +38,19 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.platform.LocalContext
 import com.recuperavc.ui.components.HistoryDialog
 import com.recuperavc.ui.main.MainScreenViewModel
+import com.recuperavc.ui.sfx.Sfx
+import com.recuperavc.ui.sfx.rememberSfxController
+import kotlinx.coroutines.flow.collectLatest
 
 @Composable
 fun AudioAnalysisScreen(viewModel: MainScreenViewModel = viewModel(factory = MainScreenViewModel.factory()), onBack: () -> Unit) {
+    val sfx = rememberSfxController()
+
+    // Play any sounds emitted by the ViewModel
+    LaunchedEffect(viewModel, sfx) {
+        viewModel.sfx.collectLatest { sfx.play(it) }
+    }
+
     var showEndDialog by remember { mutableStateOf(false) }
     AudioAnalysisContent(
         canTranscribe = viewModel.canTranscribe,
@@ -50,20 +60,39 @@ fun AudioAnalysisScreen(viewModel: MainScreenViewModel = viewModel(factory = Mai
         phraseText = viewModel.phraseText,
         isCancelling = viewModel.isCancelling,
         sessionCount = viewModel.sessionCount,
-        onRecordTapped = viewModel::toggleRecord,
-        onCancelRecording = viewModel::cancelRecording,
+        onRecordTapped = {
+            sfx.play(Sfx.CLICK)                 // tap mic
+            viewModel.toggleRecord()
+        },
+        onCancelRecording = {
+            viewModel.cancelRecording()
+        },
         onClearResults = { viewModel.clearResults() },
-        onFinishSession = { viewModel.finishSession { saved -> } },
-        onBack = { showEndDialog = true }
+        onFinishSession = {
+            sfx.play(Sfx.CLICK)                 // press “Salvar sessão”
+            viewModel.finishSession { saved ->
+                if (saved) sfx.play(Sfx.RIGHT_ANSWER) else sfx.play(Sfx.WRONG_ANSWER)
+            }
+        },
+        onBack = {
+            sfx.play(Sfx.CLICK)                 // top back button
+            showEndDialog = true
+        }
     )
     if (showEndDialog) {
         val count = viewModel.sessionCount
         AlertDialog(
-            onDismissRequest = { showEndDialog = false },
+            onDismissRequest = {
+                sfx.play(Sfx.BUBBLE)
+                showEndDialog = false
+            },
             confirmButton = {
                 Button(onClick = {
+                    sfx.play(Sfx.CLICK)
                     if (count >= 3) {
-                        viewModel.finishSession { _ -> }
+                        viewModel.finishSession { saved ->
+                            if (saved) sfx.play(Sfx.RIGHT_ANSWER) else sfx.play(Sfx.WRONG_ANSWER)
+                        }
                     } else {
                         viewModel.discardSession()
                         onBack()
@@ -74,7 +103,10 @@ fun AudioAnalysisScreen(viewModel: MainScreenViewModel = viewModel(factory = Mai
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showEndDialog = false }) { Text("Continuar") }
+                TextButton(onClick = {
+                    sfx.play(Sfx.CLICK)
+                    showEndDialog = false
+                }) { Text("Continuar") }
             },
             title = { Text("Encerrar sessão") },
             text = {
@@ -91,8 +123,14 @@ fun AudioAnalysisScreen(viewModel: MainScreenViewModel = viewModel(factory = Mai
     viewModel.sessionSummary?.let { summary ->
         SessionSummaryScreen(
             summary = summary,
-            onClose = { viewModel.dismissSummary() },
-            onNavigateHome = onBack
+            onClose = {
+                sfx.play(Sfx.CLICK)
+                viewModel.dismissSummary()
+            },
+            onNavigateHome = {
+                sfx.play(Sfx.CLICK)
+                onBack()
+            }
         )
     }
 }
