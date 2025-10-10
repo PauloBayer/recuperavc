@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
                     AppRoute.Settings -> SettingsScreen(
                         onBack = { route = AppRoute.Home }
                     )
-                    AppRoute.SentenceArrange -> SentenceTestFlow(
+                    AppRoute.SentenceArrange -> SentenceArrange(
                         context = this,
                         onBackToHome = { route = AppRoute.Home }
                     )

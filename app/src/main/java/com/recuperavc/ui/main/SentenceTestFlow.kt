@@ -30,7 +30,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.recuperavc.data.CurrentUser
 import com.recuperavc.data.db.DbProvider
 import com.recuperavc.models.CoherenceReport
 import com.recuperavc.models.CoherenceReportGroup
@@ -51,9 +50,9 @@ private val CardTint = Color(0x1AFFFFFF)
 /* ------------------------- Dados ---------------------------- */
 data class RoundResult(val typedPhrase: String, val timeElapsed: Long)
 
-/* ------------------------- Tela de Teste ---------------------------- */
+/* ------------------------- Tela Multi Rodadas ---------------------------- */
 @Composable
-fun MultiRoundSentenceScreen(
+fun SentenceArrangeMultiRound(
     context: Context,
     phrases: List<Phrase>,
     onBack: () -> Unit = {},
@@ -65,7 +64,7 @@ fun MultiRoundSentenceScreen(
 
     BackHandler(enabled = true) { onBack() }
 
-    SentenceArrangeScreenUI(
+    SentenceArrangeScreen(
         context = context,
         phraseEntity = phrases[currentRound],
         round = currentRound + 1,
@@ -82,10 +81,10 @@ fun MultiRoundSentenceScreen(
     )
 }
 
-/* ------------------------- Montagem da frase ---------------------------- */
+/* ------------------------- Tela de Montar Frase ---------------------------- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SentenceArrangeScreenUI(
+fun SentenceArrangeScreen(
     context: Context,
     modifier: Modifier = Modifier,
     phraseEntity: Phrase,
@@ -101,11 +100,13 @@ fun SentenceArrangeScreenUI(
     var result by rememberSaveable { mutableStateOf<Boolean?>(null) }
     val startTime = remember { System.currentTimeMillis() }
     val coroutineScope = rememberCoroutineScope()
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(ChipLime)
     )
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -157,7 +158,6 @@ fun SentenceArrangeScreenUI(
                                         averageTimePerTry = elapsed.toFloat() / 1000f,
                                         allTestsDescription = "typed=$typedPhrase;correct=$correct;elapsed=$elapsed",
                                         phraseId = phraseEntity.id,
-                                        userId = CurrentUser.ID
                                     )
 
                                     db.coherenceReportDao().insert(report)
@@ -257,9 +257,9 @@ fun SentenceArrangeScreenUI(
     }
 }
 
-/* ------------------------- Container da lógica ---------------------------- */
+/* ------------------------- Container Principal ---------------------------- */
 @Composable
-fun SentenceTestFlow(
+fun SentenceArrange(
     context: Context,
     onBackToHome: () -> Unit = {}
 ) {
@@ -267,7 +267,6 @@ fun SentenceTestFlow(
     var showResults by rememberSaveable { mutableStateOf(false) }
     val results = remember { mutableStateListOf<RoundResult>() }
 
-    // Buscar frases do banco
     LaunchedEffect(Unit) {
         val db = DbProvider.db(context)
         phrases = db.phraseDao().getAll()
@@ -284,7 +283,7 @@ fun SentenceTestFlow(
             }
         )
     } else if (phrases.isNotEmpty()) {
-        MultiRoundSentenceScreen(
+        SentenceArrangeMultiRound(
             context = context,
             phrases = phrases,
             onBack = onBackToHome,
@@ -295,7 +294,6 @@ fun SentenceTestFlow(
             }
         )
     } else {
-        // Loading
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("Carregando frases...", color = Color.White)
         }
@@ -372,7 +370,7 @@ private fun ResultMessageBox(isCorrect: Boolean) {
     }
 }
 
-/* ------------------------- Tela de resultado final ---------------------------- */
+/* ------------------------- Tela de Resultados ---------------------------- */
 @Composable
 fun SentenceResultScreen(
     phrases: List<String>,
@@ -464,7 +462,7 @@ fun SentenceResultScreen(
     }
 }
 
-/* ------------------------- Formata tempo ---------------------------- */
+/* ------------------------- Util ---------------------------- */
 private fun formatTime(ms: Long): String {
     val seconds = ms / 1000
     val centiseconds = ((ms % 1000) / 10.0).roundToInt()
