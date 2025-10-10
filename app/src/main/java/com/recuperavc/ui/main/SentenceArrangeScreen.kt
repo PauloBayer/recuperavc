@@ -1,13 +1,10 @@
-@file:OptIn(
-    androidx.compose.foundation.layout.ExperimentalLayoutApi::class
-)
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 
 package com.recuperavc.ui.main
 
+import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -16,16 +13,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.key
-import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.snapshots.SnapshotStateList
-import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -34,10 +29,17 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.recuperavc.data.CurrentUser
+import com.recuperavc.data.db.DbProvider
+import com.recuperavc.models.CoherenceReport
+import com.recuperavc.models.CoherenceReportGroup
+import com.recuperavc.models.Phrase
+import kotlinx.coroutines.launch
+import java.util.UUID
+import kotlin.math.roundToInt
 
-/* Cores no esquema do protótipo que a Nina fez */
+/* ------------------------- Cores ---------------------------- */
 private val Olive = Color(0xFF5E6F48)
 private val OliveDark = Color(0xFF4C5C3A)
 private val ChipLime = Color(0xFFB9E87A)
@@ -46,305 +48,272 @@ private val ChipMint = Color(0xFFDDF7B5)
 private val ChipMintText = Color(0xFF2A3A13)
 private val CardTint = Color(0x1AFFFFFF)
 
-/* O status que cada palavra pode ter */
+/* ------------------------- Dados ---------------------------- */
+data class RoundResult(val typedPhrase: String, val timeElapsed: Long)
 
-enum class WordStatus { POOL, SELECTED }
-
-@Stable
-data class Word(
-    val id: Int,
-    val text: String,
-    val status: WordStatus,
-    val selectedOrder: Int? = null
-)
-
-@Stable
-data class SentenceUIState(
-    val words: List<Word>,
-    val correctOrder: List<String>,
-    val isCorrect: Boolean? = null
-)
-
+/* ------------------------- Tela de Teste ---------------------------- */
 @Composable
-fun SentenceArrangeScreen(
-    modifier: Modifier = Modifier,
-    phrase: String,
-    onResult: (Boolean) -> Unit = {},
-    onBack: () -> Unit = {}
+fun MultiRoundSentenceScreen(
+    context: Context,
+    phrases: List<Phrase>,
+    onBack: () -> Unit = {},
+    onFinished: (List<RoundResult>) -> Unit
 ) {
-    // Handle system back
+    val totalRounds = 3
+    var currentRound by rememberSaveable { mutableStateOf(0) }
+    val results = remember { mutableStateListOf<RoundResult>() }
+
     BackHandler(enabled = true) { onBack() }
 
-    val correctOrder = rememberSaveable(phrase) { tokenize(phrase) }
-
-    // Save/restore words including selectedOrder
-    val wordsSaver = listSaver<SnapshotStateList<Word>, String>(
-        save = { list ->
-            list.map { "${it.id}|${it.text}|${it.status.name}|${it.selectedOrder ?: ""}" }
+    SentenceArrangeScreenUI(
+        context = context,
+        phraseEntity = phrases[currentRound],
+        round = currentRound + 1,
+        totalRounds = totalRounds,
+        onResult = { correct, typed, elapsed ->
+            results.add(RoundResult(typed, elapsed))
+            if (currentRound + 1 < totalRounds) {
+                currentRound++
+            } else {
+                onFinished(results.toList())
+            }
         },
-        restore = { list ->
-            list.map {
-                val parts = it.split('|', limit = 4)
-                val id = parts[0].toInt()
-                val text = parts[1]
-                val status = WordStatus.valueOf(parts[2])
-                val ord = parts.getOrNull(3)?.toIntOrNull()
-                Word(id, text, status, ord)
-            }.toMutableStateList()
-        }
-    )
-
-    val wordsState = rememberSaveable(phrase, saver = wordsSaver) {
-        tokenize(phrase)
-            .mapIndexed { index, text ->
-                Word(id = index, text = text, status = WordStatus.POOL)
-            }
-            .shuffled()
-            .toMutableStateList()
-    }
-
-    var nextOrder by rememberSaveable { mutableStateOf(0) }
-    var result: Boolean? by rememberSaveable { mutableStateOf(null) }
-
-    fun onWordClick(wordId: Int, newStatus: WordStatus) {
-        val idx = wordsState.indexOfFirst { it.id == wordId }
-        if (idx == -1) return
-        val current = wordsState[idx]
-        when (newStatus) {
-            WordStatus.SELECTED -> {
-                if (current.status != WordStatus.SELECTED) {
-                    wordsState[idx] = current.copy(status = WordStatus.SELECTED, selectedOrder = nextOrder++)
-                }
-            }
-            WordStatus.POOL -> {
-                if (current.status != WordStatus.POOL) {
-                    wordsState[idx] = current.copy(status = WordStatus.POOL, selectedOrder = null)
-                }
-            }
-        }
-        result = null
-    }
-
-    fun clearAll() {
-        for (i in wordsState.indices) {
-            val w = wordsState[i]
-            if (w.status != WordStatus.POOL || w.selectedOrder != null) {
-                wordsState[i] = w.copy(status = WordStatus.POOL, selectedOrder = null)
-            }
-        }
-        wordsState.shuffle()
-        nextOrder = 0
-        result = null
-    }
-
-    fun check() {
-        val selectedWords = wordsState
-            .filter { it.status == WordStatus.SELECTED }
-            .sortedBy { it.selectedOrder ?: Int.MAX_VALUE }
-            .map { it.text }
-        val ok = selectedWords == correctOrder
-        result = ok
-        onResult(ok)
-    }
-
-    val uiState = SentenceUIState(
-        words = wordsState,
-        correctOrder = correctOrder,
-        isCorrect = result
-    )
-
-    SentenceArrangeContent(
-        modifier = modifier.fillMaxSize(),
-        state = uiState,
-        onPoolClick = { wordId -> onWordClick(wordId, WordStatus.SELECTED) },
-        onSelectedClick = { wordId -> onWordClick(wordId, WordStatus.POOL) },
-        onClear = ::clearAll,
-        onCheck = ::check,
         onBack = onBack
     )
 }
 
+/* ------------------------- Montagem da frase ---------------------------- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SentenceArrangeContent(
-    modifier: Modifier,
-    state: SentenceUIState,
-    onPoolClick: (Int) -> Unit,
-    onSelectedClick: (Int) -> Unit,
-    onClear: () -> Unit,
-    onCheck: () -> Unit,
-    onBack: () -> Unit
+fun SentenceArrangeScreenUI(
+    context: Context,
+    modifier: Modifier = Modifier,
+    phraseEntity: Phrase,
+    round: Int,
+    totalRounds: Int,
+    onResult: (Boolean, String, Long) -> Unit = { _, _, _ -> },
+    onBack: () -> Unit = {}
 ) {
-    val chipShape = RoundedCornerShape(18.dp)
-
-    // Área selecionada de acordo com o que foi clickado; Na pool fica o restante
-    val selectedWords = state.words
-        .filter { it.status == WordStatus.SELECTED }
-        .sortedBy { it.selectedOrder ?: Int.MAX_VALUE }
-    val poolWords = state.words.filter { it.status == WordStatus.POOL }
-
-    Box(modifier = modifier.background(Olive)) {
-        Scaffold(
-            containerColor = Color.Transparent,
-            topBar = {
-                TopAppBar(
-                    title = { Text("") }, // no title
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.Filled.ArrowBack, // ← arrow back
-                                contentDescription = "Voltar",
-                                tint = Color.White
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = OliveDark,
-                        navigationIconContentColor = Color.White,
-                        titleContentColor = Color.White
-                    )
-                )
-            },
-            bottomBar = {
-                BottomAppBar(
-                    containerColor = OliveDark,
-                    contentColor = Color.White,
-                    actions = { TextButton(onClick = onClear) { Text("Limpar", color = Color.White) } },
-                    floatingActionButton = {
-                        val canCheck = selectedWords.isNotEmpty()
-                        ExtendedFloatingActionButton(
-                            onClick = { if (canCheck) onCheck() },
-                            containerColor = ChipLime,
-                            contentColor = ChipLimeText,
-                            modifier = Modifier.alpha(if (canCheck) 1f else 0.45f)
-                        ) { Text("Verificar") }
+    val phrase = phraseEntity.description
+    val words = phrase.split(" ")
+    var arrangedWords by rememberSaveable(phrase) { mutableStateOf(listOf<String>()) }
+    var availableWords by rememberSaveable(phrase) { mutableStateOf(words.shuffled()) }
+    var result by rememberSaveable { mutableStateOf<Boolean?>(null) }
+    val startTime = remember { System.currentTimeMillis() }
+    val coroutineScope = rememberCoroutineScope()
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ChipLime)
+    )
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Monte a frase ($round/$totalRounds)") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Voltar")
                     }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = OliveDark,
+                    navigationIconContentColor = Color.White,
+                    titleContentColor = Color.White
                 )
-            }
-        ) { padding ->
-            Column(
-                modifier = Modifier
-                    .padding(padding)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = "Monte a frase:",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White
-                )
+            )
+        },
+        bottomBar = {
+            BottomAppBar(
+                containerColor = OliveDark,
+                actions = {
+                    TextButton(onClick = {
+                        arrangedWords = listOf()
+                        availableWords = words.shuffled()
+                        result = null
+                    }) {
+                        Text("Limpar", color = Color.White)
+                    }
+                },
+                floatingActionButton = {
+                    val canProceed = arrangedWords.isNotEmpty()
+                    val buttonText = if (round == totalRounds) "Enviar" else "Verificar"
 
-                // Selected sentence area (no guideline)
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(CardTint)
-                        .padding(12.dp)
-                ) {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .animateContentSize(animationSpec = tween(220, easing = FastOutSlowInEasing))
-                    ) {
-                        if (selectedWords.isEmpty()) {
-                            AssistiveHint()
-                        } else {
-                            selectedWords.forEach { word ->
-                                key(word.id) {
-                                    WordChip(
-                                        text = word.text,
-                                        onClick = { onSelectedClick(word.id) },
-                                        shape = chipShape,
-                                        container = ChipMint,
-                                        content = ChipMintText
+                    ExtendedFloatingActionButton(
+                        onClick = {
+                            if (canProceed) {
+                                val endTime = System.currentTimeMillis()
+                                val elapsed = endTime - startTime
+                                val typedPhrase = arrangedWords.joinToString(" ")
+                                val correct = typedPhrase == phrase
+                                result = correct
+
+                                coroutineScope.launch {
+                                    val db = DbProvider.db(context)
+
+                                    val reportId = UUID.randomUUID()
+                                    val report = CoherenceReport(
+                                        id = reportId,
+                                        averageErrorsPerTry = if (correct) 0f else 100f,
+                                        averageTimePerTry = elapsed.toFloat() / 1000f,
+                                        allTestsDescription = "typed=$typedPhrase;correct=$correct;elapsed=$elapsed",
+                                        phraseId = phraseEntity.id,
+                                        userId = CurrentUser.ID
                                     )
+
+                                    db.coherenceReportDao().insert(report)
+                                    db.coherenceReportDao().link(
+                                        CoherenceReportGroup(
+                                            idCoherenceReport = reportId,
+                                            idPhrase = phraseEntity.id
+                                        )
+                                    )
+
+                                    onResult(correct, typedPhrase, elapsed)
                                 }
                             }
-                        }
-                    }
-
-                    // Result message (Correct/Incorrect)
-                    AnimatedVisibility(
-                        visible = state.isCorrect != null,
-                        enter = fadeIn(),
-                        exit = fadeOut()
-                    ) {
-                        ResultMessageBox(isCorrect = state.isCorrect == true)
-                    }
+                        },
+                        containerColor = ChipLime,
+                        contentColor = ChipLimeText,
+                        modifier = Modifier.alpha(if (canProceed) 1f else 0.45f)
+                    ) { Text(buttonText) }
                 }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "Monte a frase:",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White
+            )
 
-                Divider(color = Color.White.copy(alpha = .2f))
-
-                Text(
-                    text = "Toque para adicionar:",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Color.White
-                )
-
-                // Word pool area
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(CardTint)
+                    .padding(12.dp)
+            ) {
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .animateContentSize(animationSpec = tween(220, easing = FastOutSlowInEasing))
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    poolWords.forEach { word ->
-                        key(word.id) {
+                    if (arrangedWords.isEmpty()) {
+                        AssistiveHint()
+                    } else {
+                        arrangedWords.forEach { word ->
                             WordChip(
-                                text = word.text,
-                                onClick = { onPoolClick(word.id) },
-                                shape = chipShape,
-                                container = ChipLime,
-                                content = ChipLimeText
+                                text = word,
+                                onClick = {
+                                    arrangedWords = arrangedWords - word
+                                    availableWords = availableWords + word
+                                },
+                                shape = RoundedCornerShape(18.dp),
+                                container = ChipMint,
+                                content = ChipMintText
                             )
                         }
                     }
                 }
-                Spacer(Modifier.height(64.dp))
+
+                AnimatedVisibility(
+                    visible = result != null,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    ResultMessageBox(isCorrect = result == true)
+                }
             }
+
+            Divider(color = Color.White.copy(alpha = .2f))
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                availableWords.forEach { word ->
+                    WordChip(
+                        text = word,
+                        onClick = {
+                            arrangedWords = arrangedWords + word
+                            availableWords = availableWords - word
+                        },
+                        shape = RoundedCornerShape(18.dp),
+                        container = ChipLime,
+                        content = ChipLimeText
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(64.dp))
         }
     }
 }
 
-/* Os componentes */
-
+/* ------------------------- Container da lógica ---------------------------- */
 @Composable
-private fun ResultMessageBox(isCorrect: Boolean) {
-    val bg = if (isCorrect) Color(0xFFDCFCE7) else Color(0xFFFFE4E6)
-    val fg = if (isCorrect) Color(0xFF065F46) else Color(0xFF991B1B)
-    Box(
-        modifier = Modifier
-            .padding(top = 12.dp)
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(bg)
-            .padding(10.dp)
-    ) {
-        Text(
-            text = if (isCorrect) "Perfeito! ✔︎" else "A frase está errada. Tente novamente.",
-            color = fg,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium
+fun SentenceTestFlow(
+    context: Context,
+    onBackToHome: () -> Unit = {}
+) {
+    var phrases by remember { mutableStateOf<List<Phrase>>(emptyList()) }
+    var showResults by rememberSaveable { mutableStateOf(false) }
+    val results = remember { mutableStateListOf<RoundResult>() }
+
+    // Buscar frases do banco
+    LaunchedEffect(Unit) {
+        val db = DbProvider.db(context)
+        phrases = db.phraseDao().getAll()
+    }
+
+    if (showResults) {
+        SentenceResultScreen(
+            phrases = phrases.map { it.description },
+            results = results,
+            onBackToHome = onBackToHome,
+            onRestart = {
+                results.clear()
+                showResults = false
+            }
         )
+    } else if (phrases.isNotEmpty()) {
+        MultiRoundSentenceScreen(
+            context = context,
+            phrases = phrases,
+            onBack = onBackToHome,
+            onFinished = { finalResults ->
+                results.clear()
+                results.addAll(finalResults)
+                showResults = true
+            }
+        )
+    } else {
+        // Loading
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Carregando frases...", color = Color.White)
+        }
     }
 }
 
+/* ------------------------- Componentes de UI ---------------------------- */
 @Composable
 private fun WordChip(
     text: String,
     onClick: () -> Unit,
     shape: RoundedCornerShape,
     container: Color,
-    content: Color,
-    modifier: Modifier = Modifier
+    content: Color
 ) {
     var pressed by remember(text) { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (pressed) 0.96f else 1f, tween(120), label = "chipScale")
-    val alpha by animateFloatAsState(if (pressed) 0.85f else 1f, tween(120), label = "chipAlpha")
+    val scale by animateFloatAsState(if (pressed) 0.96f else 1f, tween(120))
+    val alpha by animateFloatAsState(if (pressed) 0.85f else 1f, tween(120))
 
     Surface(
         color = container,
@@ -352,7 +321,7 @@ private fun WordChip(
         shape = shape,
         tonalElevation = 1.dp,
         shadowElevation = 0.dp,
-        modifier = modifier
+        modifier = Modifier
             .scale(scale)
             .alpha(alpha)
             .clip(shape)
@@ -382,17 +351,122 @@ private fun AssistiveHint() {
     )
 }
 
-/** Tokenizador das palavras */
-private fun tokenize(sentence: String): List<String> {
-    val regex = Regex("""\p{L}+|\d+|[^\s\p{L}\d]""")
-    return regex.findAll(sentence).map { it.value }.toList()
+@Composable
+private fun ResultMessageBox(isCorrect: Boolean) {
+    val bg = if (isCorrect) Color(0xFFDCFCE7) else Color(0xFFFFE4E6)
+    val fg = if (isCorrect) Color(0xFF065F46) else Color(0xFF991B1B)
+    Box(
+        modifier = Modifier
+            .padding(top = 12.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(bg)
+            .padding(10.dp)
+    ) {
+        Text(
+            text = if (isCorrect) "Perfeito! ✔︎" else "A frase está errada. Tente novamente.",
+            color = fg,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium
+        )
+    }
 }
 
-@Preview(showBackground = true, widthDp = 360, heightDp = 700)
+/* ------------------------- Tela de resultado final ---------------------------- */
 @Composable
-private fun SentenceArrangePreview() {
-    val demo = "O rato roeu a roupa do rei de Roma"
-    MaterialTheme {
-        SentenceArrangeScreen(phrase = demo, onBack = {})
+fun SentenceResultScreen(
+    phrases: List<String>,
+    results: List<RoundResult>,
+    onBackToHome: () -> Unit = {},
+    onRestart: () -> Unit = {}
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.35f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+                .wrapContentHeight(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "Resultados Finais",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+                Spacer(Modifier.height(16.dp))
+
+                results.forEachIndexed { idx, r ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = CardTint)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "Frase correta: ${phrases[idx]}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.Black,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Sua frase: ${r.typedPhrase}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.Black
+                            )
+                            Text(
+                                text = "Tempo: ${formatTime(r.timeElapsed)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(20.dp))
+
+                Button(
+                    onClick = onRestart,
+                    colors = ButtonDefaults.buttonColors(containerColor = ChipLime),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("Reiniciar teste", color = ChipLimeText)
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                Button(
+                    onClick = onBackToHome,
+                    colors = ButtonDefaults.buttonColors(containerColor = OliveDark),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("Voltar para tela inicial", color = Color.White)
+                }
+            }
+        }
     }
+}
+
+/* ------------------------- Formata tempo ---------------------------- */
+private fun formatTime(ms: Long): String {
+    val seconds = ms / 1000
+    val centiseconds = ((ms % 1000) / 10.0).roundToInt()
+    return "$seconds.${centiseconds}s"
 }

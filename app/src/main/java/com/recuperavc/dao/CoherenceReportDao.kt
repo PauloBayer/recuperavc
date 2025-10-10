@@ -11,6 +11,7 @@ import java.util.UUID
 interface CoherenceReportDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsert(report: CoherenceReport)
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun link(group: CoherenceReportGroup)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insert(report: CoherenceReport)
 
     @Transaction
     @Query("SELECT * FROM CoherenceReport WHERE id = :id")

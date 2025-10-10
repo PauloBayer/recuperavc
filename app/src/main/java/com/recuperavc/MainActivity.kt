@@ -9,10 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.recuperavc.ui.home.HomeScreen
-import com.recuperavc.ui.main.AudioAnalysisScreen
-import com.recuperavc.ui.main.MainScreenViewModel
-import com.recuperavc.ui.main.SentenceArrangeScreen
-import com.recuperavc.ui.main.MotionTestScreen
+import com.recuperavc.ui.main.*
 import com.recuperavc.ui.theme.WhisperCppDemoTheme
 
 enum class AppRoute { Home, AudioAnalysis, SentenceArrange, MotionTest }
@@ -25,6 +22,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             WhisperCppDemoTheme {
                 var route by remember { mutableStateOf(AppRoute.Home) }
+
                 when (route) {
                     AppRoute.Home -> HomeScreen(
                         onOpenSentenceTest = { route = AppRoute.SentenceArrange },
@@ -36,14 +34,13 @@ class MainActivity : ComponentActivity() {
                         viewModel = viewModel,
                         onBack = { route = AppRoute.Home }
                     )
-                    AppRoute.SentenceArrange -> SentenceArrangeScreen(
-                        phrase = "O rato roeu a roupa do rei de Roma",
-                        onResult = { },
+                    AppRoute.MotionTest -> MotionTestScreen(
+                        onFinish = {},
                         onBack = { route = AppRoute.Home }
                     )
-                    AppRoute.MotionTest -> MotionTestScreen(
-                        onFinish = { },
-                        onBack = { route = AppRoute.Home }
+                    AppRoute.SentenceArrange -> SentenceTestFlow(
+                        context = this,
+                        onBackToHome = { route = AppRoute.Home }
                     )
                 }
             }
