@@ -8,17 +8,8 @@ import com.recuperavc.models.AudioReport
 import com.recuperavc.models.AudioReportGroup
 import com.recuperavc.models.CoherenceReport
 import com.recuperavc.models.CoherenceReportGroup
-import com.recuperavc.models.PatternCoherencePhrase
-import com.recuperavc.models.User
-
-data class UserWithAudioFiles(
-    @Embedded val user: User,
-    @Relation(
-        parentColumn = "id",
-        entityColumn = "fk_User_id"
-    )
-    val audioFiles: List<AudioFile>
-)
+import com.recuperavc.models.MotionReport
+import com.recuperavc.models.Phrase
 
 data class AudioReportWithFiles(
     @Embedded val report: AudioReport,
@@ -42,8 +33,8 @@ data class CoherenceReportWithPhrases(
         associateBy = Junction(
             value = CoherenceReportGroup::class,
             parentColumn = "idCoherenceReport",
-            entityColumn = "idPatternCoherenceReport"
+            entityColumn = "idPhrase"
         )
     )
-    val phrases: List<PatternCoherencePhrase>
+    val phrases: List<Phrase>
 )

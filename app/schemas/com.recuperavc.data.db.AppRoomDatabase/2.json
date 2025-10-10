@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 1,
-    "identityHash": "160ec7182f737d6db70ee8d83feeff71",
+    "version": 2,
+    "identityHash": "d538f8d9f7f91f98cd4f59960e8fa03e",
     "entities": [
       {
         "tableName": "User",
@@ -62,7 +62,7 @@
       },
       {
         "tableName": "AudioFile",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `path` TEXT NOT NULL, `fileType` TEXT NOT NULL, `fileName` TEXT NOT NULL, `isPattern` INTEGER NOT NULL, `audioDuration` INTEGER NOT NULL, `recordedAt` INTEGER NOT NULL, `fk_User_id` INTEGER NOT NULL, `fk_Phrase_id` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`fk_User_id`) REFERENCES `User`(`id`) ON UPDATE CASCADE ON DELETE CASCADE , FOREIGN KEY(`fk_Phrase_id`) REFERENCES `Phrase`(`id`) ON UPDATE CASCADE ON DELETE SET NULL )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `path` TEXT NOT NULL, `fileType` TEXT NOT NULL, `fileName` TEXT NOT NULL, `audioDuration` INTEGER NOT NULL, `recordedAt` INTEGER NOT NULL, `fk_User_id` INTEGER NOT NULL, `fk_Phrase_id` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`fk_User_id`) REFERENCES `User`(`id`) ON UPDATE CASCADE ON DELETE CASCADE , FOREIGN KEY(`fk_Phrase_id`) REFERENCES `Phrase`(`id`) ON UPDATE CASCADE ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "id",
@@ -86,12 +86,6 @@
             "fieldPath": "fileName",
             "columnName": "fileName",
             "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "isPattern",
-            "columnName": "isPattern",
-            "affinity": "INTEGER",
             "notNull": true
           },
           {
@@ -172,7 +166,7 @@
       },
       {
         "tableName": "AudioReport",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `hasWarning` INTEGER NOT NULL, `description` TEXT NOT NULL, `fk_User_id` INTEGER NOT NULL, `fk_AudioFile_id` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`fk_User_id`) REFERENCES `User`(`id`) ON UPDATE CASCADE ON DELETE CASCADE , FOREIGN KEY(`fk_AudioFile_id`) REFERENCES `AudioFile`(`id`) ON UPDATE CASCADE ON DELETE SET NULL )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `averageWordsPerMinute` REAL NOT NULL, `averageWordErrorRate` REAL NOT NULL, `allTestsDescription` TEXT NOT NULL, `fk_User_id` INTEGER NOT NULL, `fk_AudioFile_id` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`fk_User_id`) REFERENCES `User`(`id`) ON UPDATE CASCADE ON DELETE CASCADE , FOREIGN KEY(`fk_AudioFile_id`) REFERENCES `AudioFile`(`id`) ON UPDATE CASCADE ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "id",
@@ -181,14 +175,20 @@
             "notNull": true
           },
           {
-            "fieldPath": "hasWarning",
-            "columnName": "hasWarning",
-            "affinity": "INTEGER",
+            "fieldPath": "averageWordsPerMinute",
+            "columnName": "averageWordsPerMinute",
+            "affinity": "REAL",
             "notNull": true
           },
           {
-            "fieldPath": "description",
-            "columnName": "description",
+            "fieldPath": "averageWordErrorRate",
+            "columnName": "averageWordErrorRate",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "allTestsDescription",
+            "columnName": "allTestsDescription",
             "affinity": "TEXT",
             "notNull": true
           },
@@ -327,7 +327,7 @@
       },
       {
         "tableName": "Phrase",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `description` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `description` TEXT NOT NULL, `type` TEXT NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -338,6 +338,12 @@
           {
             "fieldPath": "description",
             "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
             "affinity": "TEXT",
             "notNull": true
           }
@@ -353,7 +359,7 @@
       },
       {
         "tableName": "CoherenceReport",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `hasWarning` INTEGER NOT NULL, `description` TEXT NOT NULL, `score` REAL NOT NULL, `fk_Phrase_id` TEXT, `fk_User_id` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`fk_User_id`) REFERENCES `User`(`id`) ON UPDATE CASCADE ON DELETE CASCADE , FOREIGN KEY(`fk_Phrase_id`) REFERENCES `Phrase`(`id`) ON UPDATE CASCADE ON DELETE SET NULL )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `averageErrorsPerTry` REAL NOT NULL, `averageTimePerTry` REAL NOT NULL, `allTestsDescription` TEXT NOT NULL, `fk_Phrase_id` TEXT, `fk_User_id` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`fk_User_id`) REFERENCES `User`(`id`) ON UPDATE CASCADE ON DELETE CASCADE , FOREIGN KEY(`fk_Phrase_id`) REFERENCES `Phrase`(`id`) ON UPDATE CASCADE ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "id",
@@ -362,21 +368,21 @@
             "notNull": true
           },
           {
-            "fieldPath": "hasWarning",
-            "columnName": "hasWarning",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "description",
-            "columnName": "description",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "score",
-            "columnName": "score",
+            "fieldPath": "averageErrorsPerTry",
+            "columnName": "averageErrorsPerTry",
             "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "averageTimePerTry",
+            "columnName": "averageTimePerTry",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "allTestsDescription",
+            "columnName": "allTestsDescription",
+            "affinity": "TEXT",
             "notNull": true
           },
           {
@@ -588,7 +594,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '160ec7182f737d6db70ee8d83feeff71')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd538f8d9f7f91f98cd4f59960e8fa03e')"
     ]
   }
 }

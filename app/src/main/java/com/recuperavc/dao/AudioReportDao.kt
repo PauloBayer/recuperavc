@@ -15,4 +15,22 @@ interface AudioReportDao {
     @Transaction
     @Query("SELECT * FROM AudioReport WHERE id = :reportId")
     fun observeWithFiles(reportId: UUID): Flow<AudioReportWithFiles?>
+
+    @Transaction
+    suspend fun insertWithFiles(report: AudioReport, fileIds: List<UUID>) {
+        upsert(report)
+        fileIds.forEach { fid ->
+            link(AudioReportGroup(idAudioReport = report.id, idAudioFile = fid))
+        }
+    }
+
+    @Transaction
+    @Query("SELECT * FROM AudioReport")
+    fun observeAllWithFiles(): kotlinx.coroutines.flow.Flow<List<com.recuperavc.models.relations.AudioReportWithFiles>>
+
+    @Query("SELECT * FROM AudioReport")
+    fun observeAll(): Flow<List<AudioReport>>
+
+    @Query("DELETE FROM AudioReport WHERE allTestsDescription NOT LIKE '{%' AND id IN (SELECT idAudioReport FROM AudioReportGroup GROUP BY idAudioReport HAVING COUNT(idAudioFile) <= 1)")
+    suspend fun deletePartialReports()
 }

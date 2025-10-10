@@ -5,7 +5,7 @@ import java.util.UUID
 
 @Entity(
     tableName = "CoherenceReportGroup",
-    primaryKeys = ["idCoherenceReport", "idPatternCoherenceReport"],
+    primaryKeys = ["idCoherenceReport", "idPhrase"],
     foreignKeys = [
         ForeignKey(
             entity = CoherenceReport::class,
@@ -15,16 +15,16 @@ import java.util.UUID
             onUpdate = ForeignKey.CASCADE
         ),
         ForeignKey(
-            entity = PatternCoherencePhrase::class,
+            entity = Phrase::class,
             parentColumns = ["id"],
-            childColumns = ["idPatternCoherenceReport"],
+            childColumns = ["idPhrase"],
             onDelete = ForeignKey.CASCADE,
             onUpdate = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("idCoherenceReport"), Index("idPatternCoherenceReport")]
+    indices = [Index("idCoherenceReport"), Index("idPhrase")]
 )
 data class CoherenceReportGroup(
     val idCoherenceReport: UUID,
-    val idPatternCoherenceReport: UUID
+    val idPhrase: UUID
 )
