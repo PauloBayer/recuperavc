@@ -1,5 +1,8 @@
 package com.recuperavc.ui.main
 
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import android.app.Application
 import android.content.Context
 import android.media.MediaPlayer
@@ -16,6 +19,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.recuperavc.media.decodeWaveFile
 import com.recuperavc.recorder.Recorder
+import com.recuperavc.ui.sfx.Sfx
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -23,14 +27,11 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import com.recuperavc.library.PhraseManager
 import com.recuperavc.data.db.DbProvider
-import com.recuperavc.data.CurrentUser
 import com.recuperavc.models.AudioFile
 import com.recuperavc.models.AudioReport
-import com.recuperavc.models.AudioReportGroup
-import com.recuperavc.models.CoherenceReport
-import com.recuperavc.models.CoherenceReportGroup
 import com.recuperavc.models.Phrase
 import com.recuperavc.models.enums.PhraseType
+ 
 import java.time.Instant
 import java.util.UUID
 import kotlinx.coroutines.delay
@@ -58,6 +59,9 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     var analysisResult by mutableStateOf<AnalysisResult?>(null)
         private set
 
+    private val _sfx = MutableSharedFlow<Sfx>(extraBufferCapacity = 8)
+    val sfx: SharedFlow<Sfx> = _sfx.asSharedFlow()
+
     var phraseText by mutableStateOf("")
         private set
 
@@ -71,7 +75,8 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         val phraseId: UUID?,
         val phraseText: String,
         val wpm: Int,
-        val wer: Double
+        val wer: Double,
+        val transcribed: String
     )
     private val sessionItems = mutableListOf<SessionItem>()
 
@@ -181,6 +186,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                     transcriptionResult = cleanText
                     analysisResult = analysis
                     isProcessing = false
+                    _sfx.tryEmit(Sfx.PROCESSING_DONE) // Finished processing
                 }
                 if (analysis != null) {
                     persistResults(file, recordingDurationMs, cleanText, analysis)
@@ -193,6 +199,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
             withContext(Dispatchers.Main) {
                 isProcessing = false
             }
+            _sfx.tryEmit(Sfx.WRONG_ANSWER)
             restoreProcessPriority()
         }
 
@@ -200,6 +207,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
             delay(800)
             clearResults()
             loadNewPhrase()
+            _sfx.tryEmit(Sfx.CLICK)
         }
         canTranscribe = true
     }
@@ -212,19 +220,23 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     ) {
         withContext(Dispatchers.IO) {
             val db = DbProvider.db(application)
-            db.userDao().upsert(
-                com.recuperavc.models.User(
-                    id = CurrentUser.ID,
-                    login = "demo",
-                    password = "demo",
-                    email = "demo@example.com",
-                    wordsPerMinute = 0f,
-                    wordErrorRate = 0f,
-                    name = "Usuário Demo"
-                )
-            )
 
-            val patternId: UUID? = currentPhrase?.id
+            val phraseDao = db.phraseDao()
+            val ensuredPhrase: Phrase = currentPhrase
+                ?: phraseDao.getAll().firstOrNull { it.description == phraseText }
+                ?: run {
+                    val inferredType = when (sessionCount % 3) {
+                        0 -> PhraseType.SHORT
+                        1 -> PhraseType.MEDIUM
+                        else -> PhraseType.BIG
+                    }
+                    val created = Phrase(description = phraseText, type = inferredType)
+                    phraseDao.upsert(created)
+                    created
+                }
+            val phraseId: UUID = ensuredPhrase.id
+
+            // 1) AudioFile
             val audioId = UUID.randomUUID()
             val audio = AudioFile(
                 id = audioId,
@@ -233,37 +245,25 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                 fileName = file.name,
                 audioDuration = recordingDurationMs.toInt(),
                 recordedAt = Instant.now(),
-                userId = CurrentUser.ID,
-                phraseId = patternId
+                phraseId = phraseId
             )
             db.audioFileDao().upsert(audio)
+
+            // Track this attempt in-memory for the session
             sessionItems.add(
                 SessionItem(
                     audioId = audioId,
-                    phraseId = patternId,
+                    phraseId = phraseId,
                     phraseText = phraseText,
                     wpm = analysis.wpm,
-                    wer = analysis.wer
+                    wer = analysis.wer,
+                    transcribed = transcribedText
                 )
             )
+
+            
+
             sessionCount = sessionItems.size
-            val coherenceId = UUID.randomUUID()
-            val coherence = CoherenceReport(
-                id = coherenceId,
-                averageErrorsPerTry = analysis.wer.toFloat(),
-                averageTimePerTry = recordingDurationMs / 1000.0f,
-                allTestsDescription =
-                    "score=${String.format("%.1f", 100 - analysis.wer)};expected=$phraseText;transcribed=$transcribedText",
-                phraseId = patternId,
-                userId = CurrentUser.ID
-            )
-            db.coherenceReportDao().upsert(coherence)
-            db.coherenceReportDao().link(
-                CoherenceReportGroup(
-                    idPhrase = patternId ?: UUID.nameUUIDFromBytes(phraseText.lowercase().toByteArray()),
-                    idCoherenceReport = coherenceId
-                )
-            )
         }
     }
 
@@ -279,23 +279,39 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                 val avgWpm = snapshot.map { it.wpm }.average().toFloat()
                 val avgWer = snapshot.map { it.wer }.average().toFloat()
                 val mainFileId = sessionItems.firstOrNull()?.audioId
-                val desc = buildString {
-                    append("count=${sessionItems.size};avgWpm=${String.format("%.1f", avgWpm)};avgWer=${String.format("%.1f", avgWer)}")
-                }
+                val database = DbProvider.db(application)
+                val desc = org.json.JSONObject().apply {
+                    put("count", snapshot.size)
+                    put("avgWpm", avgWpm)
+                    put("avgWer", avgWer)
+                    val arr = org.json.JSONArray()
+                    snapshot.forEach { item ->
+                        arr.put(
+                            org.json.JSONObject().apply {
+                                put("fileId", item.audioId.toString())
+                                put("phrase", item.phraseText)
+                                put("wpm", item.wpm)
+                                put("wer", item.wer)
+                                put("transcribed", item.transcribed)
+                            }
+                        )
+                    }
+                    put("attempts", arr)
+                }.toString()
                 val report = AudioReport(
                     id = UUID.randomUUID(),
                     averageWordsPerMinute = avgWpm,
                     averageWordErrorRate = avgWer,
                     allTestsDescription = desc,
-                    userId = CurrentUser.ID,
                     mainAudioFileId = mainFileId
                 )
-                val db = DbProvider.db(application)
-                db.audioReportDao().insertWithFiles(report, snapshot.map { it.audioId })
+                database.audioReportDao().insertWithFiles(report, snapshot.map { it.audioId })
                 val items = snapshot.map { SessionSummaryItem(it.phraseText, it.wpm, it.wer) }
                 sessionSummary = SessionSummary(avgWpm, avgWer, items)
+                _sfx.tryEmit(Sfx.RIGHT_ANSWER) // Salvo
                 true
             } else {
+                _sfx.tryEmit(Sfx.WRONG_ANSWER) // Não terminou
                 false
             }
             sessionItems.clear()
@@ -314,9 +330,10 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         clearResults()
         loadNewPhrase()
     }
-    
+
     fun cancelRecording() {
         viewModelScope.launch {
+            _sfx.tryEmit(Sfx.STOP_RECORDING)
             isCancelling = true
             recorder.stopRecording()
             isRecording = false
@@ -328,6 +345,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         try {
             if (isRecording) {
                 recorder.stopRecording()
+                _sfx.tryEmit(Sfx.STOP_RECORDING) // Finished recording
                 isRecording = false
                 val recordingDuration = System.currentTimeMillis() - recordingStartTime
                 recordedFile?.let { transcribeAudio(it, recordingDuration) }
@@ -336,10 +354,15 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                 transcriptionResult = ""
                 analysisResult = null
                 val file = getTempFileForRecording()
+
+                // Starting to record
+                _sfx.tryEmit(Sfx.START_RECORDING)
+
                 recorder.startRecording(file, { e ->
                     viewModelScope.launch {
                         withContext(Dispatchers.Main) {
                             isRecording = false
+                            _sfx.tryEmit(Sfx.WRONG_ANSWER)     // Error starting
                         }
                     }
                 }) { shouldProcess ->
@@ -348,9 +371,12 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                             recorder.stopRecording()
                             isRecording = false
                             if (shouldProcess) {
+                                _sfx.tryEmit(Sfx.STOP_RECORDING)  // Stop before processing
                                 val recordingDuration = System.currentTimeMillis() - recordingStartTime
                                 recordedFile?.let { transcribeAudio(it, recordingDuration) }
                             } else {
+                                // Silence detected, não gravou nada
+                                _sfx.tryEmit(Sfx.WRONG_ANSWER)
                                 Log.d(LOG_TAG, "Gravação cancelada - nenhum áudio detectado")
                             }
                         }
@@ -362,6 +388,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
             }
         } catch (e: Exception) {
             Log.w(LOG_TAG, e)
+            _sfx.tryEmit(Sfx.WRONG_ANSWER) // Generic error
             isRecording = false
         }
     }

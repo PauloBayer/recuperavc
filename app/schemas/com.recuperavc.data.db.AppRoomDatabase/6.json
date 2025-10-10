@@ -1,68 +1,12 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 4,
-    "identityHash": "f4f1aeda8a3199dca47f54e01c4b0707",
+    "version": 6,
+    "identityHash": "bf12a4b488e9389c9a30793ffc7d1d8f",
     "entities": [
       {
-        "tableName": "User",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `login` TEXT NOT NULL, `password` TEXT NOT NULL, `email` TEXT NOT NULL, `wordsPerMinute` REAL NOT NULL, `wordErrorRate` REAL NOT NULL, `name` TEXT NOT NULL, PRIMARY KEY(`id`))",
-        "fields": [
-          {
-            "fieldPath": "id",
-            "columnName": "id",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "login",
-            "columnName": "login",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "password",
-            "columnName": "password",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "email",
-            "columnName": "email",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "wordsPerMinute",
-            "columnName": "wordsPerMinute",
-            "affinity": "REAL",
-            "notNull": true
-          },
-          {
-            "fieldPath": "wordErrorRate",
-            "columnName": "wordErrorRate",
-            "affinity": "REAL",
-            "notNull": true
-          },
-          {
-            "fieldPath": "name",
-            "columnName": "name",
-            "affinity": "TEXT",
-            "notNull": true
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": false,
-          "columnNames": [
-            "id"
-          ]
-        },
-        "indices": [],
-        "foreignKeys": []
-      },
-      {
         "tableName": "AudioFile",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `path` TEXT NOT NULL, `fileType` TEXT NOT NULL, `fileName` TEXT NOT NULL, `audioDuration` INTEGER NOT NULL, `recordedAt` INTEGER NOT NULL, `fk_User_id` INTEGER NOT NULL, `fk_Phrase_id` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`fk_User_id`) REFERENCES `User`(`id`) ON UPDATE CASCADE ON DELETE CASCADE , FOREIGN KEY(`fk_Phrase_id`) REFERENCES `Phrase`(`id`) ON UPDATE CASCADE ON DELETE SET NULL )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `path` TEXT NOT NULL, `fileType` TEXT NOT NULL, `fileName` TEXT NOT NULL, `audioDuration` INTEGER NOT NULL, `recordedAt` INTEGER NOT NULL, `fk_Phrase_id` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`fk_Phrase_id`) REFERENCES `Phrase`(`id`) ON UPDATE CASCADE ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "id",
@@ -101,12 +45,6 @@
             "notNull": true
           },
           {
-            "fieldPath": "userId",
-            "columnName": "fk_User_id",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
             "fieldPath": "phraseId",
             "columnName": "fk_Phrase_id",
             "affinity": "TEXT",
@@ -121,15 +59,6 @@
         },
         "indices": [
           {
-            "name": "index_AudioFile_fk_User_id",
-            "unique": false,
-            "columnNames": [
-              "fk_User_id"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_AudioFile_fk_User_id` ON `${TABLE_NAME}` (`fk_User_id`)"
-          },
-          {
             "name": "index_AudioFile_fk_Phrase_id",
             "unique": false,
             "columnNames": [
@@ -140,17 +69,6 @@
           }
         ],
         "foreignKeys": [
-          {
-            "table": "User",
-            "onDelete": "CASCADE",
-            "onUpdate": "CASCADE",
-            "columns": [
-              "fk_User_id"
-            ],
-            "referencedColumns": [
-              "id"
-            ]
-          },
           {
             "table": "Phrase",
             "onDelete": "SET NULL",
@@ -166,7 +84,7 @@
       },
       {
         "tableName": "AudioReport",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `averageWordsPerMinute` REAL NOT NULL, `averageWordErrorRate` REAL NOT NULL, `allTestsDescription` TEXT NOT NULL, `fk_User_id` INTEGER NOT NULL, `fk_AudioFile_id` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`fk_User_id`) REFERENCES `User`(`id`) ON UPDATE CASCADE ON DELETE CASCADE , FOREIGN KEY(`fk_AudioFile_id`) REFERENCES `AudioFile`(`id`) ON UPDATE CASCADE ON DELETE SET NULL )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `averageWordsPerMinute` REAL NOT NULL, `averageWordErrorRate` REAL NOT NULL, `allTestsDescription` TEXT NOT NULL, `fk_AudioFile_id` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`fk_AudioFile_id`) REFERENCES `AudioFile`(`id`) ON UPDATE CASCADE ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "id",
@@ -193,12 +111,6 @@
             "notNull": true
           },
           {
-            "fieldPath": "userId",
-            "columnName": "fk_User_id",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
             "fieldPath": "mainAudioFileId",
             "columnName": "fk_AudioFile_id",
             "affinity": "TEXT",
@@ -213,15 +125,6 @@
         },
         "indices": [
           {
-            "name": "index_AudioReport_fk_User_id",
-            "unique": false,
-            "columnNames": [
-              "fk_User_id"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_AudioReport_fk_User_id` ON `${TABLE_NAME}` (`fk_User_id`)"
-          },
-          {
             "name": "index_AudioReport_fk_AudioFile_id",
             "unique": false,
             "columnNames": [
@@ -232,17 +135,6 @@
           }
         ],
         "foreignKeys": [
-          {
-            "table": "User",
-            "onDelete": "CASCADE",
-            "onUpdate": "CASCADE",
-            "columns": [
-              "fk_User_id"
-            ],
-            "referencedColumns": [
-              "id"
-            ]
-          },
           {
             "table": "AudioFile",
             "onDelete": "SET NULL",
@@ -359,7 +251,7 @@
       },
       {
         "tableName": "CoherenceReport",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `averageErrorsPerTry` REAL NOT NULL, `averageTimePerTry` REAL NOT NULL, `allTestsDescription` TEXT NOT NULL, `fk_Phrase_id` TEXT, `fk_User_id` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`fk_User_id`) REFERENCES `User`(`id`) ON UPDATE CASCADE ON DELETE CASCADE , FOREIGN KEY(`fk_Phrase_id`) REFERENCES `Phrase`(`id`) ON UPDATE CASCADE ON DELETE SET NULL )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `averageErrorsPerTry` REAL NOT NULL, `averageTimePerTry` REAL NOT NULL, `allTestsDescription` TEXT NOT NULL, `fk_Phrase_id` TEXT, PRIMARY KEY(`id`), FOREIGN KEY(`fk_Phrase_id`) REFERENCES `Phrase`(`id`) ON UPDATE CASCADE ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "id",
@@ -390,12 +282,6 @@
             "columnName": "fk_Phrase_id",
             "affinity": "TEXT",
             "notNull": false
-          },
-          {
-            "fieldPath": "userId",
-            "columnName": "fk_User_id",
-            "affinity": "INTEGER",
-            "notNull": true
           }
         ],
         "primaryKey": {
@@ -405,15 +291,6 @@
           ]
         },
         "indices": [
-          {
-            "name": "index_CoherenceReport_fk_User_id",
-            "unique": false,
-            "columnNames": [
-              "fk_User_id"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_CoherenceReport_fk_User_id` ON `${TABLE_NAME}` (`fk_User_id`)"
-          },
           {
             "name": "index_CoherenceReport_fk_Phrase_id",
             "unique": false,
@@ -425,17 +302,6 @@
           }
         ],
         "foreignKeys": [
-          {
-            "table": "User",
-            "onDelete": "CASCADE",
-            "onUpdate": "CASCADE",
-            "columns": [
-              "fk_User_id"
-            ],
-            "referencedColumns": [
-              "id"
-            ]
-          },
           {
             "table": "Phrase",
             "onDelete": "SET NULL",
@@ -520,7 +386,7 @@
       },
       {
         "tableName": "MotionReport",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `date` INTEGER NOT NULL, `secondsTotal` REAL NOT NULL, `clicksPerMinute` INTEGER NOT NULL, `totalClicks` INTEGER NOT NULL, `withRightHand` INTEGER NOT NULL, `withMainHand` INTEGER NOT NULL, `withMovement` INTEGER NOT NULL, `missedClicks` INTEGER NOT NULL DEFAULT 0, `fk_user_id` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`fk_user_id`) REFERENCES `User`(`id`) ON UPDATE CASCADE ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `date` INTEGER NOT NULL, `secondsTotal` REAL NOT NULL, `clicksPerMinute` INTEGER NOT NULL, `totalClicks` INTEGER NOT NULL, `withRightHand` INTEGER NOT NULL, `withMainHand` INTEGER NOT NULL, `withMovement` INTEGER NOT NULL, `missedClicks` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -576,12 +442,6 @@
             "affinity": "INTEGER",
             "notNull": true,
             "defaultValue": "0"
-          },
-          {
-            "fieldPath": "userId",
-            "columnName": "fk_user_id",
-            "affinity": "INTEGER",
-            "notNull": true
           }
         ],
         "primaryKey": {
@@ -590,36 +450,14 @@
             "id"
           ]
         },
-        "indices": [
-          {
-            "name": "index_MotionReport_fk_user_id",
-            "unique": false,
-            "columnNames": [
-              "fk_user_id"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_MotionReport_fk_user_id` ON `${TABLE_NAME}` (`fk_user_id`)"
-          }
-        ],
-        "foreignKeys": [
-          {
-            "table": "User",
-            "onDelete": "CASCADE",
-            "onUpdate": "CASCADE",
-            "columns": [
-              "fk_user_id"
-            ],
-            "referencedColumns": [
-              "id"
-            ]
-          }
-        ]
+        "indices": [],
+        "foreignKeys": []
       }
     ],
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f4f1aeda8a3199dca47f54e01c4b0707')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'bf12a4b488e9389c9a30793ffc7d1d8f')"
     ]
   }
 }

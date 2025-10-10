@@ -11,14 +11,7 @@ import java.util.UUID
 
 @Entity(
     tableName = "MotionReport",
-    foreignKeys = [ForeignKey(
-        entity = User::class,
-        parentColumns = ["id"],
-        childColumns = ["fk_user_id"],
-        onDelete = CASCADE,
-        onUpdate = CASCADE
-    )],
-    indices = [Index("fk_user_id")]
+    foreignKeys = []
 )
 data class MotionReport(
     @PrimaryKey val id: UUID = UUID.randomUUID(),
@@ -26,6 +19,8 @@ data class MotionReport(
     val secondsTotal: Float,
     val clicksPerMinute: Int,
     val totalClicks: Int,
-    @ColumnInfo(defaultValue = "0") val missedClicks: Int,
-    @ColumnInfo(name = "fk_user_id") val userId: Int
+    val withRightHand: Boolean,
+    val withMainHand: Boolean,
+    val withMovement: Boolean,
+    @ColumnInfo(defaultValue = "0") val missedClicks: Int
 )

@@ -19,7 +19,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.recuperavc.data.CurrentUser
 import com.recuperavc.data.db.DbProvider
 import com.recuperavc.models.MotionReport
 import com.recuperavc.ui.theme.GreenAccent
@@ -32,84 +31,67 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 import kotlin.random.Random
+import com.recuperavc.ui.sfx.Sfx
+import com.recuperavc.ui.sfx.rememberSfxController
 
 private enum class MotionMode { MOVING, STATIC }
+private enum class Hand { RIGHT, LEFT }
 
 @SuppressLint("UnrememberedMutableState")
 @Composable
 fun MotionTestScreen(
     modifier: Modifier = Modifier,
-    durationSeconds: Int = 60,
+    durationSecondsWithMovement: Int = 60,
+    durationSecondsWithoutMovement: Int = 30,
     onFinish: (Int) -> Unit = {},
     onBack: () -> Unit = {}
 ) {
+    val sfx = rememberSfxController()
+
     BackHandler(enabled = true) { onBack() }
 
     val context = LocalContext.current
     val db = remember(context) { DbProvider.db(context) }
     val scope = rememberCoroutineScope()
 
-    // Modo escolhido pelo usuário
+    // Escolhas do usuário antes do teste
+    var selectedHand by remember { mutableStateOf<Hand?>(null) }
+    var isDominant by remember { mutableStateOf<Boolean?>(null) }
     var chosenMode by remember { mutableStateOf<MotionMode?>(null) }
 
-    // Infos do teste
+    // Controle do ciclo do teste
+    var testStarted by remember { mutableStateOf(false) }
     var clicks by remember { mutableStateOf(0) }
     var missedClicks by remember { mutableStateOf(0) }
-    var timeLeft by remember { mutableStateOf(durationSeconds) }
+    var timeLeft by remember { mutableStateOf(durationSecondsWithMovement) }
     var finished by remember { mutableStateOf(false) }
     var buttonPosition by remember { mutableStateOf(Offset.Zero) }
     var lastReport by remember { mutableStateOf<MotionReport?>(null) }
 
     // Histórico
     val history by db.MotionReportDao()
-        .observeForUser(CurrentUser.ID)
+        .observeAll()
         .collectAsState(initial = emptyList())
 
     val density = LocalDensity.current
 
-    // Medindo aqui o tamanho do header pro botão nunca aparecer em cima
+    // Medida do header pra evitar sobreposição do botão
     var headerHeightPx by remember { mutableStateOf(0f) }
-    val headerMarginPx = 12f // mais uma margem de segurança
+    val headerMarginPx = 12f
 
-    // Timer aqui que só começa dps q o tipo do teste é escolhido
-    LaunchedEffect(chosenMode) {
-        if (chosenMode != null) {
-            timeLeft = durationSeconds
-            clicks = 0
-            missedClicks = 0
-            finished = false
-            while (timeLeft > 0) {
-                delay(1_000)
-                timeLeft--
-            }
-            val minutes = durationSeconds / 60f
-            val clicksPerMinute = if (minutes > 0) (clicks / minutes).toInt() else clicks
-
-            val report = MotionReport(
-                date = Instant.now(),
-                secondsTotal = durationSeconds.toFloat(),
-                clicksPerMinute = clicksPerMinute,
-                totalClicks = clicks,
-                missedClicks = missedClicks,
-                userId = CurrentUser.ID
-            )
-            scope.launch { db.MotionReportDao().upsert(report) }
-            lastReport = report
-            finished = true
-            onFinish(clicks)
-        }
-    }
+    fun durationFor(mode: MotionMode?) =
+        if (mode == MotionMode.STATIC) durationSecondsWithoutMovement else durationSecondsWithMovement
 
     @Suppress("UnusedBoxWithConstraintsScope")
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(Color.White)
-            // Cliques errados aqui
-            .pointerInput(chosenMode, finished) {
+            // Cliques errados fora do botão
+            .pointerInput(testStarted, finished) {
                 detectTapGestures(
                     onTap = {
-                        if (!finished && chosenMode != null) missedClicks++
+                        if (testStarted && !finished) missedClicks++
                     }
                 )
             }
@@ -130,45 +112,50 @@ fun MotionTestScreen(
             buttonPosition = Offset(x, y)
         }
 
-        // Pro botão começar a se mover
-        LaunchedEffect(chosenMode, headerHeightPx) {
-            if (chosenMode == MotionMode.MOVING) moveButtonRandomly()
-        }
+        // Quando o teste começa (após “Começar teste”), inicia timer e reseta contadores
+        LaunchedEffect(testStarted) {
+            if (testStarted) {
+                // Duração efetiva de acordo com o modo
+                val effectiveDuration = durationFor(chosenMode)
 
-        // Componentes antes de começar o teste
-        if (chosenMode == null) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text("Como deseja realizar o teste?", fontSize = 22.sp, color = GreenDark)
-                Spacer(Modifier.height(16.dp))
-                Button(
-                    onClick = { chosenMode = MotionMode.MOVING },
-                    colors = ButtonDefaults.buttonColors(containerColor = GreenDark),
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Com movimento (botão muda de posição)", color = Color.White) }
-                Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick = { chosenMode = MotionMode.STATIC },
-                    colors = ButtonDefaults.buttonColors(containerColor = GreenAccent),
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Sem movimento (botão fixo)", color = Color.White) }
-                Spacer(Modifier.height(24.dp))
-                Text(
-                    "Você terá ${durationSeconds}s para tocar o botão o máximo possível.",
-                    fontSize = 14.sp,
-                    color = Color.Black
+                timeLeft = effectiveDuration
+                clicks = 0
+                missedClicks = 0
+                finished = false
+
+                // Se modo com movimento, posiciona o botão inicialmente
+                if (chosenMode == MotionMode.MOVING) moveButtonRandomly()
+
+                while (timeLeft > 0) {
+                    delay(1_000)
+                    timeLeft--
+                }
+
+                // Cálculo correto por minuto baseado na duração efetiva
+                val clicksPerMinute = if (effectiveDuration > 0) {
+                    ((clicks * 60.0) / effectiveDuration).roundToInt()
+                } else 0
+
+                // Persistir com o novo modelo
+                val report = MotionReport(
+                    date = Instant.now(),
+                    secondsTotal = effectiveDuration.toFloat(),
+                    clicksPerMinute = clicksPerMinute,
+                    totalClicks = clicks,
+                    withRightHand = (selectedHand == Hand.RIGHT),
+                    withMainHand = (isDominant == true),
+                    withMovement = (chosenMode == MotionMode.MOVING),
+                    missedClicks = missedClicks
                 )
+                scope.launch { db.MotionReportDao().upsert(report) }
+                lastReport = report
+                finished = true
+                onFinish(clicks)
             }
-            return@BoxWithConstraints
         }
 
-        // Header enquanto o teste estiver rodando
-        if (!finished) {
+        // HEADER enquanto o teste roda
+        if (testStarted && !finished) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -186,8 +173,125 @@ fun MotionTestScreen(
             }
         }
 
-        // Corpo do teste fica aqui
-        if (!finished && chosenMode == MotionMode.MOVING) {
+        // TELA DE PRÉ-TESTE
+        if (!testStarted && !finished) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("Antes de começar", fontSize = 22.sp, color = GreenDark)
+                Spacer(Modifier.height(16.dp))
+
+                // 1) Mão usada
+                Text("Qual mão você vai usar?", fontSize = 16.sp, color = Color.Black)
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        onClick = { selectedHand = Hand.RIGHT },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (selectedHand == Hand.RIGHT) GreenDark else GreenAccent
+                        )
+                    ) { Text("Direita", color = Color.White) }
+
+                    Button(
+                        onClick = { selectedHand = Hand.LEFT },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (selectedHand == Hand.LEFT) GreenDark else GreenAccent
+                        )
+                    ) { Text("Esquerda", color = Color.White) }
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                // 2) Dominância
+                Text("É a sua mão dominante?", fontSize = 16.sp, color = Color.Black)
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        onClick = { isDominant = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isDominant == true) GreenDark else GreenAccent
+                        )
+                    ) { Text("Sim", color = Color.White) }
+
+                    Button(
+                        onClick = { isDominant = false },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isDominant == false) GreenDark else GreenAccent
+                        )
+                    ) { Text("Não", color = Color.White) }
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                // 3) Modo do teste
+                Text("Como deseja realizar o teste?", fontSize = 16.sp, color = Color.Black)
+                Spacer(Modifier.height(8.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = { chosenMode = MotionMode.MOVING },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (chosenMode == MotionMode.MOVING) GreenDark else GreenAccent
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Com movimento (botão muda de posição)", color = Color.White) }
+
+                    Button(
+                        onClick = { chosenMode = MotionMode.STATIC },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (chosenMode == MotionMode.STATIC) GreenDark else GreenAccent
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Sem movimento (botão fixo)", color = Color.White) }
+                }
+
+                Spacer(Modifier.height(20.dp))
+
+                // Texto informando a duração correta conforme a escolha
+                val previewDuration = when (chosenMode) {
+                    MotionMode.MOVING -> durationSecondsWithMovement
+                    MotionMode.STATIC -> durationSecondsWithoutMovement
+                    null -> null
+                }
+                Text(
+                    text = previewDuration?.let { "Você terá ${it}s para tocar o botão o máximo possível." }
+                        ?: "Você terá ${durationSecondsWithMovement}s com movimento ou ${durationSecondsWithoutMovement}s sem movimento.",
+                    fontSize = 14.sp,
+                    color = Color.Black
+                )
+
+                Spacer(Modifier.height(20.dp))
+
+                val canStart = selectedHand != null && isDominant != null && chosenMode != null
+                Button(
+                    onClick = {
+                        sfx.play(Sfx.CLICK) // short pop ao iniciar
+                        testStarted = true
+                    },
+                    enabled = canStart,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (canStart) GreenDark else Color(0xFF9E9E9E)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Começar teste", color = Color.White) }
+
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = {
+                        sfx.play(Sfx.CLICK) // feedback no voltar
+                        onBack()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Voltar") }
+            }
+            return@BoxWithConstraints
+        }
+
+        // CORPO DO TESTE
+        if (testStarted && !finished && chosenMode == MotionMode.MOVING) {
             // Botão que se movimenta
             Box(
                 modifier = Modifier
@@ -201,6 +305,7 @@ fun MotionTestScreen(
                 Button(
                     onClick = {
                         clicks++
+                        sfx.play(Sfx.BUBBLE)   // bubble pop no modo com movimento
                         moveButtonRandomly()
                     },
                     modifier = Modifier.size(movingButtonSize),
@@ -212,8 +317,8 @@ fun MotionTestScreen(
             }
         }
 
-        if (!finished && chosenMode == MotionMode.STATIC) {
-            // Botão que fica parado
+        if (testStarted && !finished && chosenMode == MotionMode.STATIC) {
+            // Botão estático centralizado abaixo do header
             val headerHeightDp = with(density) { (headerHeightPx + headerMarginPx).toDp() }
             Box(
                 modifier = Modifier
@@ -222,7 +327,10 @@ fun MotionTestScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Button(
-                    onClick = { clicks++ },
+                    onClick = {
+                        clicks++
+                        sfx.play(Sfx.CLICK)    // short pop no modo sem movimento
+                    },
                     modifier = Modifier.size(staticButtonSize),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = GreenAccent,
@@ -232,7 +340,7 @@ fun MotionTestScreen(
             }
         }
 
-        // Componentes dos resultados recentes
+        // RESULTADOS
         if (finished) {
             Column(
                 modifier = Modifier
@@ -263,12 +371,26 @@ fun MotionTestScreen(
                 Spacer(Modifier.height(24.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(
-                        onClick = { chosenMode = null },
+                        onClick = {
+                            sfx.play(Sfx.CLICK)
+                            // Reset total para novo teste
+                            selectedHand = null
+                            isDominant = null
+                            chosenMode = null
+                            testStarted = false
+                            finished = false
+                            clicks = 0
+                            missedClicks = 0
+                            timeLeft = durationSecondsWithMovement
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = GreenAccent)
                     ) { Text("Novo teste", color = Color.White) }
 
                     Button(
-                        onClick = onBack,
+                        onClick = {
+                            sfx.play(Sfx.CLICK)
+                            onBack()
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
                     ) { Text("Voltar", color = Color.White) }
                 }
@@ -277,6 +399,7 @@ fun MotionTestScreen(
     }
 }
 
+// Relatório no final
 @Composable
 private fun ReportCard(report: MotionReport) {
     val dateStr = remember(report.date) {
@@ -296,6 +419,23 @@ private fun ReportCard(report: MotionReport) {
             Text("Cliques totais: ${report.totalClicks}", fontSize = 14.sp, color = Color.Black)
             Text("Cliques por minuto: ${report.clicksPerMinute}", fontSize = 14.sp, color = Color.Black)
             Text("Cliques errados: ${report.missedClicks}", fontSize = 14.sp, color = Color.Black)
+            Spacer(Modifier.height(8.dp))
+            // Atributos do teste
+            Text(
+                "Mão usada: ${if (report.withRightHand) "Direita" else "Esquerda"}",
+                fontSize = 14.sp,
+                color = Color.Black
+            )
+            Text(
+                "Mão dominante: ${if (report.withMainHand) "Sim" else "Não"}",
+                fontSize = 14.sp,
+                color = Color.Black
+            )
+            Text(
+                "Modo: ${if (report.withMovement) "Com movimento" else "Sem movimento"}",
+                fontSize = 14.sp,
+                color = Color.Black
+            )
         }
     }
 }
@@ -321,6 +461,13 @@ private fun SmallReportRow(report: MotionReport) {
                 Text(
                     "   ${report.totalClicks} cliques • ${report.clicksPerMinute} cpm • ${report.missedClicks} errados",
                     fontSize = 13.sp,
+                    color = Color.Black
+                )
+                Text(
+                    "   ${if (report.withRightHand) "Mão direita" else "Mão esquerda"} • " +
+                            (if (report.withMainHand) "Dominante" else "Não dominante") + " • " +
+                            (if (report.withMovement) "Com movimento" else "Sem movimento"),
+                    fontSize = 12.sp,
                     color = Color.Black
                 )
             }

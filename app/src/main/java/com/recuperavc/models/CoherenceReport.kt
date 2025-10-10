@@ -7,13 +7,6 @@ import java.util.UUID
     tableName = "CoherenceReport",
     foreignKeys = [
         ForeignKey(
-            entity = User::class,
-            parentColumns = ["id"],
-            childColumns = ["fk_User_id"],
-            onDelete = ForeignKey.CASCADE,
-            onUpdate = ForeignKey.CASCADE
-        ),
-        ForeignKey(
             entity = Phrase::class,
             parentColumns = ["id"],
             childColumns = ["fk_Phrase_id"],
@@ -21,13 +14,12 @@ import java.util.UUID
             onUpdate = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("fk_User_id"), Index("fk_Phrase_id")]
+    indices = [Index("fk_Phrase_id")]
 )
 data class CoherenceReport(
     @PrimaryKey val id: UUID = UUID.randomUUID(),
     val averageErrorsPerTry: Float,
     val averageTimePerTry: Float,
     val allTestsDescription: String,
-    @ColumnInfo(name = "fk_Phrase_id") val phraseId: UUID?,
-    @ColumnInfo(name = "fk_User_id") val userId: Int
+    @ColumnInfo(name = "fk_Phrase_id") val phraseId: UUID?
 )
