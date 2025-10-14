@@ -48,7 +48,7 @@ private val ChipMintText = Color(0xFF2A3A13)
 private val CardTint = Color(0x1AFFFFFF)
 
 /* ------------------------- Dados ---------------------------- */
-data class RoundResult(val typedPhrase: String, val timeElapsed: Long)
+data class RoundResult(val phraseId: java.util.UUID, val typedPhrase: String, val timeElapsed: Long, val correct: Boolean)
 
 /* ------------------------- Tela Multi Rodadas ---------------------------- */
 @Composable
@@ -70,7 +70,7 @@ fun SentenceArrangeMultiRound(
         round = currentRound + 1,
         totalRounds = totalRounds,
         onResult = { correct, typed, elapsed ->
-            results.add(RoundResult(typed, elapsed))
+            results.add(RoundResult(phrases[currentRound].id, typed, elapsed, correct))
             if (currentRound + 1 < totalRounds) {
                 currentRound++
             } else {
@@ -147,29 +147,7 @@ fun SentenceArrangeScreen(
                                 val typedPhrase = arrangedWords.joinToString(" ")
                                 val correct = typedPhrase == phrase
                                 result = correct
-
-                                coroutineScope.launch {
-                                    val db = DbProvider.db(context)
-
-                                    val reportId = UUID.randomUUID()
-                                    val report = CoherenceReport(
-                                        id = reportId,
-                                        averageErrorsPerTry = if (correct) 0f else 100f,
-                                        averageTimePerTry = elapsed.toFloat() / 1000f,
-                                        allTestsDescription = "typed=$typedPhrase;correct=$correct;elapsed=$elapsed",
-                                        phraseId = phraseEntity.id,
-                                    )
-
-                                    db.coherenceReportDao().insert(report)
-                                    db.coherenceReportDao().link(
-                                        CoherenceReportGroup(
-                                            idCoherenceReport = reportId,
-                                            idPhrase = phraseEntity.id
-                                        )
-                                    )
-
-                                    onResult(correct, typedPhrase, elapsed)
-                                }
+                                onResult(correct, typedPhrase, elapsed)
                             }
                         },
                         containerColor = ChipLime,
@@ -266,6 +244,7 @@ fun SentenceArrange(
     var phrases by remember { mutableStateOf<List<Phrase>>(emptyList()) }
     var showResults by rememberSaveable { mutableStateOf(false) }
     val results = remember { mutableStateListOf<RoundResult>() }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         val db = DbProvider.db(context)
@@ -273,8 +252,9 @@ fun SentenceArrange(
     }
 
     if (showResults) {
+        val phraseMap = remember(phrases) { phrases.associateBy { it.id } }
         SentenceResultScreen(
-            phrases = phrases.map { it.description },
+            phrases = results.map { phraseMap[it.phraseId]?.description ?: "" },
             results = results,
             onBackToHome = onBackToHome,
             onRestart = {
@@ -288,9 +268,51 @@ fun SentenceArrange(
             phrases = phrases,
             onBack = onBackToHome,
             onFinished = { finalResults ->
-                results.clear()
-                results.addAll(finalResults)
-                showResults = true
+                scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    val db = DbProvider.db(context)
+                    val count = finalResults.size
+                    val avgTimeSec = if (count > 0) finalResults.map { it.timeElapsed }.average().toFloat() / 1000f else 0f
+                    val avgErrorsPerTry = if (count > 0) finalResults.map { if (it.correct) 0f else 1f }.average().toFloat() else 0f
+                    val reportId = java.util.UUID.randomUUID()
+                    val mainPhraseId = finalResults.firstOrNull()?.phraseId
+                    val attemptsArray = org.json.JSONArray().apply {
+                        finalResults.forEach { r ->
+                            put(org.json.JSONObject().apply {
+                                put("phraseId", r.phraseId.toString())
+                                put("typed", r.typedPhrase)
+                                put("correct", r.correct)
+                                put("elapsedMs", r.timeElapsed)
+                            })
+                        }
+                    }
+                    val desc = org.json.JSONObject().apply {
+                        put("count", count)
+                        put("avgTimeSec", avgTimeSec)
+                        put("avgErrorsPerTry", avgErrorsPerTry)
+                        put("attempts", attemptsArray)
+                    }.toString()
+                    val report = CoherenceReport(
+                        id = reportId,
+                        averageErrorsPerTry = avgErrorsPerTry,
+                        averageTimePerTry = avgTimeSec,
+                        allTestsDescription = desc,
+                        phraseId = mainPhraseId
+                    )
+                    db.coherenceReportDao().upsert(report)
+                    finalResults.map { it.phraseId }.distinct().forEach { pid ->
+                        db.coherenceReportDao().link(
+                            CoherenceReportGroup(
+                                idCoherenceReport = reportId,
+                                idPhrase = pid
+                            )
+                        )
+                    }
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        results.clear()
+                        results.addAll(finalResults)
+                        showResults = true
+                    }
+                }
             }
         )
     } else {
