@@ -15,6 +15,7 @@ import com.recuperavc.ui.main.SentenceArrangeScreen
 import com.recuperavc.ui.main.MotionTestScreen
 import com.recuperavc.ui.main.ReportsScreen
 import com.recuperavc.ui.settings.SettingsScreen
+import com.recuperavc.ui.main.*
 import com.recuperavc.ui.theme.WhisperCppDemoTheme
 
 enum class AppRoute { Home, AudioAnalysis, SentenceArrange, MotionTest, Reports, Settings }
@@ -40,11 +41,6 @@ class MainActivity : ComponentActivity() {
                         viewModel = viewModel,
                         onBack = { route = AppRoute.Home }
                     )
-                    AppRoute.SentenceArrange -> SentenceArrangeScreen(
-                        phrase = "O rato roeu a roupa do rei de Roma",
-                        onResult = { },
-                        onBack = { route = AppRoute.Home }
-                    )
                     AppRoute.MotionTest -> MotionTestScreen(
                         onFinish = { },
                         onBack = { route = AppRoute.Home }
@@ -54,6 +50,10 @@ class MainActivity : ComponentActivity() {
                     )
                     AppRoute.Settings -> SettingsScreen(
                         onBack = { route = AppRoute.Home }
+                    )
+                    AppRoute.SentenceArrange -> SentenceArrange(
+                        context = this,
+                        onBackToHome = { route = AppRoute.Home }
                     )
                 }
             }
