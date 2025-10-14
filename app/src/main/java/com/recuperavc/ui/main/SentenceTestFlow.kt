@@ -48,7 +48,14 @@ private val ChipMintText = Color(0xFF2A3A13)
 private val CardTint = Color(0x1AFFFFFF)
 
 /* ------------------------- Dados ---------------------------- */
-data class RoundResult(val typedPhrase: String, val timeElapsed: Long)
+data class CoherenceTry(val typedPhrase: String, val correct: Boolean, val elapsedMs: Long)
+data class RoundResult(
+    val phraseId: java.util.UUID,
+    val typedPhrase: String,
+    val timeElapsed: Long,
+    val correct: Boolean,
+    val tries: List<CoherenceTry>
+)
 
 /* ------------------------- Tela Multi Rodadas ---------------------------- */
 @Composable
@@ -69,8 +76,8 @@ fun SentenceArrangeMultiRound(
         phraseEntity = phrases[currentRound],
         round = currentRound + 1,
         totalRounds = totalRounds,
-        onResult = { correct, typed, elapsed ->
-            results.add(RoundResult(typed, elapsed))
+        onResult = { result ->
+            results.add(result)
             if (currentRound + 1 < totalRounds) {
                 currentRound++
             } else {
@@ -90,7 +97,7 @@ fun SentenceArrangeScreen(
     phraseEntity: Phrase,
     round: Int,
     totalRounds: Int,
-    onResult: (Boolean, String, Long) -> Unit = { _, _, _ -> },
+    onResult: (RoundResult) -> Unit = {},
     onBack: () -> Unit = {}
 ) {
     val phrase = phraseEntity.description
@@ -98,7 +105,8 @@ fun SentenceArrangeScreen(
     var arrangedWords by rememberSaveable(phrase) { mutableStateOf(listOf<String>()) }
     var availableWords by rememberSaveable(phrase) { mutableStateOf(words.shuffled()) }
     var result by rememberSaveable { mutableStateOf<Boolean?>(null) }
-    val startTime = remember { System.currentTimeMillis() }
+    val startTime = remember(phrase) { System.currentTimeMillis() }
+    val tries = remember(phrase) { mutableStateListOf<CoherenceTry>() }
     val coroutineScope = rememberCoroutineScope()
 
     Box(
@@ -147,28 +155,17 @@ fun SentenceArrangeScreen(
                                 val typedPhrase = arrangedWords.joinToString(" ")
                                 val correct = typedPhrase == phrase
                                 result = correct
-
-                                coroutineScope.launch {
-                                    val db = DbProvider.db(context)
-
-                                    val reportId = UUID.randomUUID()
-                                    val report = CoherenceReport(
-                                        id = reportId,
-                                        averageErrorsPerTry = if (correct) 0f else 100f,
-                                        averageTimePerTry = elapsed.toFloat() / 1000f,
-                                        allTestsDescription = "typed=$typedPhrase;correct=$correct;elapsed=$elapsed",
-                                        phraseId = phraseEntity.id,
-                                    )
-
-                                    db.coherenceReportDao().insert(report)
-                                    db.coherenceReportDao().link(
-                                        CoherenceReportGroup(
-                                            idCoherenceReport = reportId,
-                                            idPhrase = phraseEntity.id
+                                tries.add(CoherenceTry(typedPhrase, correct, elapsed))
+                                if (correct) {
+                                    onResult(
+                                        RoundResult(
+                                            phraseId = phraseEntity.id,
+                                            typedPhrase = typedPhrase,
+                                            timeElapsed = elapsed,
+                                            correct = true,
+                                            tries = tries.toList()
                                         )
                                     )
-
-                                    onResult(correct, typedPhrase, elapsed)
                                 }
                             }
                         },
@@ -266,6 +263,7 @@ fun SentenceArrange(
     var phrases by remember { mutableStateOf<List<Phrase>>(emptyList()) }
     var showResults by rememberSaveable { mutableStateOf(false) }
     val results = remember { mutableStateListOf<RoundResult>() }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         val db = DbProvider.db(context)
@@ -273,8 +271,9 @@ fun SentenceArrange(
     }
 
     if (showResults) {
+        val phraseMap = remember(phrases) { phrases.associateBy { it.id } }
         SentenceResultScreen(
-            phrases = phrases.map { it.description },
+            phrases = results.map { phraseMap[it.phraseId]?.description ?: "" },
             results = results,
             onBackToHome = onBackToHome,
             onRestart = {
@@ -288,9 +287,65 @@ fun SentenceArrange(
             phrases = phrases,
             onBack = onBackToHome,
             onFinished = { finalResults ->
-                results.clear()
-                results.addAll(finalResults)
-                showResults = true
+                scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    val db = DbProvider.db(context)
+                    val count = finalResults.size
+                    val avgTimeUntilCorrectSec = if (count > 0) finalResults.map { it.timeElapsed }.average().toFloat() / 1000f else 0f
+                    val avgTries = if (count > 0) finalResults.map { it.tries.size }.average().toFloat() else 0f
+                    val successRate = if (count > 0) finalResults.count { it.correct }.toFloat() / count.toFloat() else 0f
+                    val reportId = java.util.UUID.randomUUID()
+                    val mainPhraseId = finalResults.firstOrNull()?.phraseId
+                    val savedAt = System.currentTimeMillis()
+                    val attemptsArray = org.json.JSONArray().apply {
+                        finalResults.forEach { r ->
+                            val triesArr = org.json.JSONArray().apply {
+                                r.tries.forEach { t ->
+                                    put(org.json.JSONObject().apply {
+                                        put("typed", t.typedPhrase)
+                                        put("correct", t.correct)
+                                        put("elapsedMs", t.elapsedMs)
+                                    })
+                                }
+                            }
+                            put(org.json.JSONObject().apply {
+                                put("phraseId", r.phraseId.toString())
+                                put("success", r.correct)
+                                put("triesCount", r.tries.size)
+                                put("timeUntilCorrectMs", r.timeElapsed)
+                                put("tries", triesArr)
+                            })
+                        }
+                    }
+                    val desc = org.json.JSONObject().apply {
+                        put("count", count)
+                        put("avgTimeUntilCorrectSec", avgTimeUntilCorrectSec)
+                        put("avgTries", avgTries)
+                        put("successRate", successRate)
+                        put("savedAtEpochMs", savedAt)
+                        put("attempts", attemptsArray)
+                    }.toString()
+                    val report = CoherenceReport(
+                        id = reportId,
+                        averageErrorsPerTry = avgTries,
+                        averageTimePerTry = avgTimeUntilCorrectSec,
+                        allTestsDescription = desc,
+                        phraseId = mainPhraseId
+                    )
+                    db.coherenceReportDao().upsert(report)
+                    finalResults.map { it.phraseId }.distinct().forEach { pid ->
+                        db.coherenceReportDao().link(
+                            CoherenceReportGroup(
+                                idCoherenceReport = reportId,
+                                idPhrase = pid
+                            )
+                        )
+                    }
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        results.clear()
+                        results.addAll(finalResults)
+                        showResults = true
+                    }
+                }
             }
         )
     } else {

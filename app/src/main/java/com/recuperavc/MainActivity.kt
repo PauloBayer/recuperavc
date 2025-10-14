@@ -11,7 +11,6 @@ import androidx.compose.runtime.setValue
 import com.recuperavc.ui.home.HomeScreen
 import com.recuperavc.ui.main.AudioAnalysisScreen
 import com.recuperavc.ui.main.MainScreenViewModel
-import com.recuperavc.ui.main.SentenceArrangeScreen
 import com.recuperavc.ui.main.MotionTestScreen
 import com.recuperavc.ui.main.ReportsScreen
 import com.recuperavc.ui.settings.SettingsScreen
