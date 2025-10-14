@@ -48,7 +48,14 @@ private val ChipMintText = Color(0xFF2A3A13)
 private val CardTint = Color(0x1AFFFFFF)
 
 /* ------------------------- Dados ---------------------------- */
-data class RoundResult(val phraseId: java.util.UUID, val typedPhrase: String, val timeElapsed: Long, val correct: Boolean)
+data class CoherenceTry(val typedPhrase: String, val correct: Boolean, val elapsedMs: Long)
+data class RoundResult(
+    val phraseId: java.util.UUID,
+    val typedPhrase: String,
+    val timeElapsed: Long,
+    val correct: Boolean,
+    val tries: List<CoherenceTry>
+)
 
 /* ------------------------- Tela Multi Rodadas ---------------------------- */
 @Composable
@@ -69,8 +76,8 @@ fun SentenceArrangeMultiRound(
         phraseEntity = phrases[currentRound],
         round = currentRound + 1,
         totalRounds = totalRounds,
-        onResult = { correct, typed, elapsed ->
-            results.add(RoundResult(phrases[currentRound].id, typed, elapsed, correct))
+        onResult = { result ->
+            results.add(result)
             if (currentRound + 1 < totalRounds) {
                 currentRound++
             } else {
@@ -90,7 +97,7 @@ fun SentenceArrangeScreen(
     phraseEntity: Phrase,
     round: Int,
     totalRounds: Int,
-    onResult: (Boolean, String, Long) -> Unit = { _, _, _ -> },
+    onResult: (RoundResult) -> Unit = {},
     onBack: () -> Unit = {}
 ) {
     val phrase = phraseEntity.description
@@ -98,7 +105,8 @@ fun SentenceArrangeScreen(
     var arrangedWords by rememberSaveable(phrase) { mutableStateOf(listOf<String>()) }
     var availableWords by rememberSaveable(phrase) { mutableStateOf(words.shuffled()) }
     var result by rememberSaveable { mutableStateOf<Boolean?>(null) }
-    val startTime = remember { System.currentTimeMillis() }
+    val startTime = remember(phrase) { System.currentTimeMillis() }
+    val tries = remember(phrase) { mutableStateListOf<CoherenceTry>() }
     val coroutineScope = rememberCoroutineScope()
 
     Box(
@@ -147,7 +155,18 @@ fun SentenceArrangeScreen(
                                 val typedPhrase = arrangedWords.joinToString(" ")
                                 val correct = typedPhrase == phrase
                                 result = correct
-                                onResult(correct, typedPhrase, elapsed)
+                                tries.add(CoherenceTry(typedPhrase, correct, elapsed))
+                                if (correct) {
+                                    onResult(
+                                        RoundResult(
+                                            phraseId = phraseEntity.id,
+                                            typedPhrase = typedPhrase,
+                                            timeElapsed = elapsed,
+                                            correct = true,
+                                            tries = tries.toList()
+                                        )
+                                    )
+                                }
                             }
                         },
                         containerColor = ChipLime,
@@ -271,30 +290,44 @@ fun SentenceArrange(
                 scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                     val db = DbProvider.db(context)
                     val count = finalResults.size
-                    val avgTimeSec = if (count > 0) finalResults.map { it.timeElapsed }.average().toFloat() / 1000f else 0f
-                    val avgErrorsPerTry = if (count > 0) finalResults.map { if (it.correct) 0f else 1f }.average().toFloat() else 0f
+                    val avgTimeUntilCorrectSec = if (count > 0) finalResults.map { it.timeElapsed }.average().toFloat() / 1000f else 0f
+                    val avgTries = if (count > 0) finalResults.map { it.tries.size }.average().toFloat() else 0f
+                    val successRate = if (count > 0) finalResults.count { it.correct }.toFloat() / count.toFloat() else 0f
                     val reportId = java.util.UUID.randomUUID()
                     val mainPhraseId = finalResults.firstOrNull()?.phraseId
+                    val savedAt = System.currentTimeMillis()
                     val attemptsArray = org.json.JSONArray().apply {
                         finalResults.forEach { r ->
+                            val triesArr = org.json.JSONArray().apply {
+                                r.tries.forEach { t ->
+                                    put(org.json.JSONObject().apply {
+                                        put("typed", t.typedPhrase)
+                                        put("correct", t.correct)
+                                        put("elapsedMs", t.elapsedMs)
+                                    })
+                                }
+                            }
                             put(org.json.JSONObject().apply {
                                 put("phraseId", r.phraseId.toString())
-                                put("typed", r.typedPhrase)
-                                put("correct", r.correct)
-                                put("elapsedMs", r.timeElapsed)
+                                put("success", r.correct)
+                                put("triesCount", r.tries.size)
+                                put("timeUntilCorrectMs", r.timeElapsed)
+                                put("tries", triesArr)
                             })
                         }
                     }
                     val desc = org.json.JSONObject().apply {
                         put("count", count)
-                        put("avgTimeSec", avgTimeSec)
-                        put("avgErrorsPerTry", avgErrorsPerTry)
+                        put("avgTimeUntilCorrectSec", avgTimeUntilCorrectSec)
+                        put("avgTries", avgTries)
+                        put("successRate", successRate)
+                        put("savedAtEpochMs", savedAt)
                         put("attempts", attemptsArray)
                     }.toString()
                     val report = CoherenceReport(
                         id = reportId,
-                        averageErrorsPerTry = avgErrorsPerTry,
-                        averageTimePerTry = avgTimeSec,
+                        averageErrorsPerTry = avgTries,
+                        averageTimePerTry = avgTimeUntilCorrectSec,
                         allTestsDescription = desc,
                         phraseId = mainPhraseId
                     )

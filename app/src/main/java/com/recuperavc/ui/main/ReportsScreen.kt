@@ -15,10 +15,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Gesture
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -54,6 +58,7 @@ import com.recuperavc.ui.sfx.Sfx
 import com.recuperavc.ui.sfx.rememberSfxController
 
 enum class ChartType { WPM, WER }
+private enum class CoherenceChartType { TIME, ERRORS }
 
 @Composable
 fun ReportsScreen(onBack: () -> Unit) {
@@ -63,6 +68,7 @@ fun ReportsScreen(onBack: () -> Unit) {
 
     var tab by remember { mutableStateOf(ReportTab.Audio) }
     var selectedAudioReport by remember { mutableStateOf<Pair<AudioReportWithFiles, ChartType>?>(null) }
+    var selectedCoherenceReport by remember { mutableStateOf<Pair<com.recuperavc.models.CoherenceReport, CoherenceChartType>?>(null) }
 
     val now = remember { Instant.now() }
     val defaultStartDate = remember { now.minus(7, ChronoUnit.DAYS) }
@@ -95,6 +101,26 @@ fun ReportsScreen(onBack: () -> Unit) {
 
     val motionReports = remember(rawMotionReports, startDate, endDate) {
         rawMotionReports.filter { it.date >= startDate && it.date <= endDate }
+    }
+
+    val coherenceReports by db.coherenceReportDao()
+        .observeAll()
+        .collectAsState(initial = emptyList())
+
+    val filteredCoherenceReports = remember(coherenceReports, startDate, endDate) {
+        coherenceReports.filter { r ->
+            val groups = parseCoherenceReportGroups(r.allTestsDescription)
+            val savedAt = parseCoherenceReportSavedAt(r.allTestsDescription)
+            groups.isNotEmpty() && savedAt?.let { ts ->
+                val inst = java.time.Instant.ofEpochMilli(ts)
+                inst >= startDate && inst <= endDate
+            } == true
+        }
+    }
+
+    var phrases by remember { mutableStateOf<List<com.recuperavc.models.Phrase>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        phrases = db.phraseDao().getAll()
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -181,6 +207,11 @@ fun ReportsScreen(onBack: () -> Unit) {
                         onSelectReport = { report, chartType -> selectedAudioReport = report to chartType },
                         onBarTapSound = { sfx.play(Sfx.CLICK) } // toque na barra
                     )
+                    ReportTab.Coherence -> CoherenceReportSection(
+                        items = filteredCoherenceReports,
+                        onSelectReport = { report, chartType -> selectedCoherenceReport = report to chartType },
+                        onBarTapSound = { sfx.play(Sfx.CLICK) }
+                    )
                     ReportTab.Motion -> MotionReportSection(motionReports)
                 }
             }
@@ -194,20 +225,30 @@ fun ReportsScreen(onBack: () -> Unit) {
                 onAnyTap = { sfx.play(Sfx.CLICK) } // fundo, play/pause, fechar
             )
         }
+
+        selectedCoherenceReport?.let { (rep, chartType) ->
+            CoherenceReportDetailDialog(
+                report = rep,
+                chartType = chartType,
+                phraseMap = remember(phrases) { phrases.associateBy { it.id } },
+                onDismiss = { selectedCoherenceReport = null },
+                onAnyTap = { sfx.play(Sfx.CLICK) }
+            )
+        }
     }
 }
 
-private enum class ReportTab { Audio, Motion }
+private enum class ReportTab { Audio, Coherence, Motion }
 
 @Composable
 private fun SegmentedTabs(tab: ReportTab, onTab: (ReportTab) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(GreenLight.copy(alpha = 0.15f))
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+            .clip(RoundedCornerShape(20.dp))
+            .background(GreenLight.copy(alpha = 0.2f))
+            .padding(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         SegButton(
             modifier = Modifier.weight(1f),
@@ -216,7 +257,13 @@ private fun SegmentedTabs(tab: ReportTab, onTab: (ReportTab) -> Unit) {
             text = "Voz",
             onClick = { onTab(ReportTab.Audio) }
         )
-        Spacer(Modifier.width(8.dp))
+        SegButton(
+            modifier = Modifier.weight(1f),
+            selected = tab == ReportTab.Coherence,
+            icon = Icons.Default.TrendingUp,
+            text = "Raciocínio",
+            onClick = { onTab(ReportTab.Coherence) }
+        )
         SegButton(
             modifier = Modifier.weight(1f),
             selected = tab == ReportTab.Motion,
@@ -235,20 +282,39 @@ private fun SegButton(
     text: String,
     onClick: () -> Unit
 ) {
-    val bg = if (selected) GreenDark else Color.Transparent
-    val fg = if (selected) Color.White else OnBackground
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(bg)
-            .clickable { onClick() }
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
+    val bg = if (selected) GreenDark else Color.White
+    val fg = if (selected) Color.White else GreenDark
+    val elevation = if (selected) 4.dp else 0.dp
+
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = bg),
+        elevation = CardDefaults.cardElevation(defaultElevation = elevation)
     ) {
-        Icon(icon, contentDescription = null, tint = fg)
-        Spacer(Modifier.width(8.dp))
-        Text(text, color = fg, fontWeight = FontWeight.SemiBold)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onClick() }
+                .padding(vertical = 14.dp, horizontal = 8.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = fg,
+                modifier = Modifier.size(26.dp)
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text,
+                color = fg,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
@@ -888,6 +954,505 @@ private fun MotionReportSection(items: List<com.recuperavc.models.MotionReport>)
         }
     }
 }
+
+@Composable
+private fun CoherenceReportSection(
+    items: List<com.recuperavc.models.CoherenceReport>,
+    onSelectReport: (com.recuperavc.models.CoherenceReport, CoherenceChartType) -> Unit,
+    onBarTapSound: () -> Unit
+) {
+    val pointsTime = items.map { it.averageTimePerTry }
+    val pointsErrors = items.map { it.averageErrorsPerTry }
+    val labels = items.map { r ->
+        parseCoherenceReportSavedAt(r.allTestsDescription)?.let { ts ->
+            val local = java.time.LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(ts), java.time.ZoneId.systemDefault())
+            java.time.format.DateTimeFormatter.ofPattern("dd/MM").format(local)
+        } ?: ""
+    }
+
+    if (items.isEmpty()) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Default.TrendingUp,
+                    contentDescription = null,
+                    tint = Color.Black.copy(alpha = 0.3f),
+                    modifier = Modifier.size(64.dp)
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = "Nenhum relatório encontrado",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+        return
+    }
+
+    Text(
+        text = "Toque nas barras para ver detalhes",
+        fontSize = 16.sp,
+        color = GreenDark,
+        fontWeight = FontWeight.SemiBold,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth()
+    )
+    Spacer(Modifier.height(16.dp))
+
+    ChartCard(title = "Tempo até acerto", subtitle = "Segundos por frase (quanto menor, melhor)") {
+        BarChart(
+            points = pointsTime,
+            labels = labels,
+            yAxisLabel = "s",
+            onBarClick = { idx -> items.getOrNull(idx)?.let { onSelectReport(it, CoherenceChartType.TIME) } },
+            onBarTapSound = onBarTapSound
+        )
+    }
+    Spacer(Modifier.height(16.dp))
+    ChartCard(title = "Tentativas por frase", subtitle = "Média de tentativas (quanto menor, melhor)") {
+        BarChart(
+            points = pointsErrors,
+            labels = labels,
+            yAxisLabel = "Tentativas",
+            onBarClick = { idx -> items.getOrNull(idx)?.let { onSelectReport(it, CoherenceChartType.ERRORS) } },
+            onBarTapSound = onBarTapSound
+        )
+    }
+}
+
+@Composable
+private fun CoherenceReportDetailDialog(
+    report: com.recuperavc.models.CoherenceReport,
+    chartType: CoherenceChartType,
+    phraseMap: Map<java.util.UUID, com.recuperavc.models.Phrase>,
+    onDismiss: () -> Unit,
+    onAnyTap: () -> Unit
+) {
+    val groups = remember(report.allTestsDescription) { parseCoherenceReportGroups(report.allTestsDescription) }
+    val savedAt = remember(report.allTestsDescription) { parseCoherenceReportSavedAt(report.allTestsDescription) }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.6f))
+            .pointerInput(Unit) { detectTapGestures { onAnyTap(); onDismiss() } }
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+                .align(Alignment.Center)
+                .pointerInput(Unit) { },
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 650.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            "Teste de Raciocínio",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 24.sp,
+                            color = GreenDark
+                        )
+                        if (savedAt != null) {
+                            val local = java.time.LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(savedAt), java.time.ZoneId.systemDefault())
+                            Text(
+                                java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy 'às' HH:mm").format(local),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.Black.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                    Icon(
+                        Icons.Default.TrendingUp,
+                        contentDescription = null,
+                        tint = GreenDark,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+
+                Spacer(Modifier.height(20.dp))
+
+                val sr = if (groups.isNotEmpty()) groups.count { it.success }.toFloat() / groups.size.toFloat() else 0f
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = GreenLight.copy(alpha = 0.15f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            "Resumo do Teste",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = GreenDark
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            StatsBox(
+                                modifier = Modifier.weight(1f),
+                                label = "Frases",
+                                value = "${groups.size}",
+                                icon = Icons.Default.Description
+                            )
+                            StatsBox(
+                                modifier = Modifier.weight(1f),
+                                label = "Taxa de Acerto",
+                                value = "${String.format("%.0f", sr * 100)}%",
+                                icon = Icons.Default.CheckCircle
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            StatsBox(
+                                modifier = Modifier.weight(1f),
+                                label = "Tempo Médio",
+                                value = "${String.format("%.1f", report.averageTimePerTry)}s",
+                                icon = Icons.Default.Timer
+                            )
+                            StatsBox(
+                                modifier = Modifier.weight(1f),
+                                label = "Tentativas Médias",
+                                value = String.format("%.1f", report.averageErrorsPerTry),
+                                icon = Icons.Default.RepeatOne
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(20.dp))
+
+                Text(
+                    "Detalhes por Frase",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = Color.Black
+                )
+                Spacer(Modifier.height(12.dp))
+
+                groups.forEachIndexed { idx, g ->
+                    val phrase = g.phraseId?.let { phraseMap[it]?.description } ?: ""
+                    val ok = g.success
+                    val statusColor = if (ok) Color(0xFF2E7D32) else Color(0xFFD32F2F)
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Frase ${idx + 1}",
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 18.sp,
+                                    color = Color.Black
+                                )
+                                Card(
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = statusColor.copy(alpha = 0.15f)
+                                    )
+                                ) {
+                                    Text(
+                                        text = if (ok) "✓ Acertou" else "✗ Errou",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = statusColor,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+
+                            if (phrase.isNotBlank()) {
+                                Spacer(Modifier.height(12.dp))
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
+                                ) {
+                                    Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                                        Text(
+                                            "Frase Correta:",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.Black.copy(alpha = 0.5f)
+                                        )
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(
+                                            phrase,
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color.Black
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(Modifier.height(12.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                InfoCard(
+                                    modifier = Modifier.weight(1f),
+                                    label = "Tentativas",
+                                    value = "${g.triesCount}"
+                                )
+                                InfoCard(
+                                    modifier = Modifier.weight(1f),
+                                    label = "Tempo",
+                                    value = "${String.format("%.1f", g.timeUntilCorrectMs / 1000f)}s"
+                                )
+                            }
+
+                            if (g.tries.isNotEmpty()) {
+                                Spacer(Modifier.height(12.dp))
+                                Text(
+                                    "Histórico de Tentativas:",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black.copy(alpha = 0.7f)
+                                )
+                                Spacer(Modifier.height(8.dp))
+
+                                g.tries.forEachIndexed { tIdx, t ->
+                                    val tColor = if (t.correct) Color(0xFF2E7D32) else Color(0xFFD32F2F)
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(tColor.copy(alpha = 0.08f))
+                                            .padding(10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                "${tIdx + 1}.",
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = tColor
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(
+                                                t.typed,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color.Black
+                                            )
+                                        }
+                                        Text(
+                                            "${String.format("%.1f", t.elapsedMs / 1000f)}s",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = tColor
+                                        )
+                                    }
+                                    if (tIdx < g.tries.lastIndex) Spacer(Modifier.height(6.dp))
+                                }
+                            }
+                        }
+                    }
+                    if (idx < groups.lastIndex) Spacer(Modifier.height(12.dp))
+                }
+
+                Spacer(Modifier.height(20.dp))
+                Button(
+                    onClick = {
+                        onAnyTap()
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = GreenDark),
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("Fechar", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsBox(
+    modifier: Modifier = Modifier,
+    label: String,
+    value: String,
+    icon: ImageVector
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = GreenDark,
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                value,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 20.sp,
+                color = GreenDark
+            )
+            Text(
+                label,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.Black.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+private fun InfoCard(
+    modifier: Modifier = Modifier,
+    label: String,
+    value: String
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                label,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black.copy(alpha = 0.6f)
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                value,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 16.sp,
+                color = GreenDark
+            )
+        }
+    }
+}
+
+private data class CoherencePhraseGroup(
+    val phraseId: java.util.UUID?,
+    val success: Boolean,
+    val triesCount: Int,
+    val timeUntilCorrectMs: Long,
+    val tries: List<CoherencePhraseTry>
+)
+
+private data class CoherencePhraseTry(
+    val typed: String,
+    val correct: Boolean,
+    val elapsedMs: Long
+)
+
+private fun parseCoherenceReportGroups(desc: String): List<CoherencePhraseGroup> {
+    return try {
+        val root = org.json.JSONObject(desc)
+        val arr = root.optJSONArray("attempts") ?: return emptyList()
+        buildList {
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                val pidStr = o.optString("phraseId", null)
+                val triesArr = o.optJSONArray("tries")
+                val triesList = mutableListOf<CoherencePhraseTry>()
+                if (triesArr != null) {
+                    for (j in 0 until triesArr.length()) {
+                        val to = triesArr.getJSONObject(j)
+                        triesList.add(
+                            CoherencePhraseTry(
+                                typed = to.optString("typed", ""),
+                                correct = to.optBoolean("correct", false),
+                                elapsedMs = to.optLong("elapsedMs", 0L)
+                            )
+                        )
+                    }
+                }
+                add(
+                    CoherencePhraseGroup(
+                        phraseId = pidStr?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() },
+                        success = o.optBoolean("success", false),
+                        triesCount = o.optInt("triesCount", triesList.size),
+                        timeUntilCorrectMs = o.optLong("timeUntilCorrectMs", 0L),
+                        tries = triesList
+                    )
+                )
+            }
+        }
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
+private fun parseCoherenceReportSavedAt(desc: String): Long? {
+    return try {
+        val root = org.json.JSONObject(desc)
+        if (!root.has("savedAtEpochMs")) return null
+        root.optLong("savedAtEpochMs", 0L).takeIf { it > 0L }
+    } catch (_: Exception) {
+        null
+    }
+}
+
 
 @Composable
 private fun ChartCard(title: String, subtitle: String, content: @Composable () -> Unit) {
