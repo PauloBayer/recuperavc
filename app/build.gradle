@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace 'com.recuperavc'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "com.recuperavc"
         minSdk 26
-        targetSdk 34
+        targetSdk 35
         versionCode 1
         versionName "1.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -48,6 +48,13 @@ dependencies {
     implementation "androidx.room:room-runtime:$roomVersion"
     implementation "androidx.room:room-ktx:$roomVersion"
     ksp "androidx.room:room-compiler:$roomVersion"
+    implementation "androidx.datastore:datastore-preferences:1.1.1"
+    implementation "androidx.lifecycle:lifecycle-livedata-ktx:2.9.4"
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.9.4"
+    implementation "androidx.compose.runtime:runtime-livedata:1.9.2"
+
+
+
 
     implementation 'androidx.activity:activity-compose:1.7.2'
     implementation 'androidx.compose.material:material-icons-core:1.5.0'
