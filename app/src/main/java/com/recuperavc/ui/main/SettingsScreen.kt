@@ -15,9 +15,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.recuperavc.models.SettingsViewModel
+import com.recuperavc.ui.factory.SettingsViewModelFactory
 import com.recuperavc.ui.theme.GreenDark
 import com.recuperavc.ui.theme.GreenLight
 import com.recuperavc.ui.theme.OnBackground
@@ -28,16 +32,34 @@ import com.recuperavc.ui.sfx.rememberSfxController
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    // Deixando aqui algumas configs para serem usadas para quando tiver a lógica
-    onApply: (darkMode: Boolean, highContrast: Boolean, fontScale: Float) -> Unit = { _, _, _ -> }
+    onApply: (darkMode: Boolean, contrast: Boolean, fontScale: Float) -> Unit = { _, _, _ -> }
 ) {
+    val context = LocalContext.current
+    val viewModel: SettingsViewModel = viewModel(
+        factory = SettingsViewModelFactory(context)
+    )
+
     val sfx = rememberSfxController()
 
-    var darkMode by remember { mutableStateOf(false) }
-    var highContrast by remember { mutableStateOf(false) }
-    var fontScale by remember { mutableStateOf(1.0f) }
+    // Observando os estados do ViewModel
+    val darkMode by viewModel.darkModeFlow.collectAsState(initial = false)
+    val contrast by viewModel.contrastFlow.collectAsState(initial = false)
+    val sizeText by viewModel.sizeTextFlow.collectAsState(initial = 1.0f)
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+    // Slider temporário
+    var sliderValue by remember { mutableStateOf(sizeText) }
+    LaunchedEffect(sizeText) { sliderValue = sizeText }
+
+    // Aplicando o tema responsivo
+    val backgroundColor = when {
+        contrast -> Color.Black
+        darkMode -> Color(0xFF121212)
+        else -> Color.White
+    }
+    val textColor = if (contrast || darkMode) Color.White else Color.Black
+
+    Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
+
         // Header
         Box(modifier = Modifier.fillMaxWidth().height(160.dp)) {
             Canvas(modifier = Modifier.fillMaxSize()) {
@@ -69,7 +91,7 @@ fun SettingsScreen(
                 verticalAlignment = Alignment.Top
             ) {
                 IconButton(onClick = { sfx.play(Sfx.CLICK); onBack() }) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = null, tint = OnBackground)
+                    Icon(Icons.Default.ArrowBack, contentDescription = null, tint = textColor)
                 }
             }
         }
@@ -85,7 +107,7 @@ fun SettingsScreen(
                 text = "Preferências do App",
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
-                color = OnBackground
+                color = textColor
             )
             Spacer(Modifier.height(16.dp))
 
@@ -93,12 +115,25 @@ fun SettingsScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = backgroundColor),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
                 Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                    Text("Aparência", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
+                    Text("Aparência", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = textColor)
                     Spacer(Modifier.height(8.dp))
+
+                    SettingSwitchRow(
+                        title = "Alto contraste",
+                        subtitle = "Melhora a legibilidade com maior contraste",
+                        checked = contrast,
+                        onCheckedChange = {
+                            sfx.play(Sfx.CLICK)
+                            viewModel.setContrastText(it)
+                        },
+                        textColor = textColor
+                    )
+
+                    Spacer(Modifier.height(12.dp))
 
                     SettingSwitchRow(
                         title = "Modo escuro",
@@ -106,20 +141,9 @@ fun SettingsScreen(
                         checked = darkMode,
                         onCheckedChange = {
                             sfx.play(Sfx.CLICK)
-                            darkMode = it
-                        }
-                    )
-
-                    Spacer(Modifier.height(12.dp))
-
-                    SettingSwitchRow(
-                        title = "Alto contraste",
-                        subtitle = "Melhora a legibilidade com maior contraste",
-                        checked = highContrast,
-                        onCheckedChange = {
-                            sfx.play(Sfx.CLICK)
-                            highContrast = it
-                        }
+                            viewModel.setDarkMode(it)
+                        },
+                        textColor = textColor
                     )
                 }
             }
@@ -130,51 +154,41 @@ fun SettingsScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = backgroundColor),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
                 Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                    Text("Tamanho do texto", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
+                    Text("Tamanho do texto", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = textColor)
                     Spacer(Modifier.height(8.dp))
 
-                    val percent = (fontScale * 100).roundToInt()
+                    val percent = (sizeText * 100).roundToInt()
                     Text(
                         "Tamanho atual: $percent%",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.Black.copy(alpha = 0.7f)
+                        color = textColor.copy(alpha = 0.7f)
                     )
                     Spacer(Modifier.height(8.dp))
 
-                    // Slider da fonte
                     Column {
                         Slider(
-                            value = fontScale,
-                            onValueChange = { fontScale = it.coerceIn(0.8f, 1.6f) },
+                            value = sliderValue,
+                            onValueChange = { sliderValue = it },
                             valueRange = 0.8f..1.6f,
                             steps = 7,
-                            onValueChangeFinished = { sfx.play(Sfx.CLICK) }
+                            onValueChangeFinished = { viewModel.setSizeText(sliderValue) }
                         )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            TextButton(onClick = {
-                                sfx.play(Sfx.CLICK)
-                                fontScale = (fontScale - 0.1f).coerceIn(0.8f, 1.6f)
-                            }) {
+                            TextButton(onClick = { viewModel.setSizeText((sizeText - 0.1f).coerceIn(0.8f, 1.6f)) }) {
                                 Text("A-", color = GreenDark, fontWeight = FontWeight.Bold)
                             }
-                            TextButton(onClick = {
-                                sfx.play(Sfx.CLICK)
-                                fontScale = 1.0f
-                            }) {
+                            TextButton(onClick = { viewModel.setSizeText(1.0f) }) {
                                 Text("Padrão", color = GreenDark, fontWeight = FontWeight.Bold)
                             }
-                            TextButton(onClick = {
-                                sfx.play(Sfx.CLICK)
-                                fontScale = (fontScale + 0.1f).coerceIn(0.8f, 1.6f)
-                            }) {
+                            TextButton(onClick = { viewModel.setSizeText((sizeText + 0.1f).coerceIn(0.8f, 1.6f)) }) {
                                 Text("A+", color = GreenDark, fontWeight = FontWeight.Bold)
                             }
                         }
@@ -184,56 +198,53 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            // Texto de prévia
+            // Texto de pré-visualização
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (highContrast) Color.Black else Color(0xFFF5F5F5)
-                ),
+                colors = CardDefaults.cardColors(containerColor = if (contrast) textColor else Color(0xFFF5F5F5)),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    horizontalAlignment = Alignment.Start
-                ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                     Text(
                         "Pré-visualização",
-                        fontSize = (16.sp * fontScale),
+                        fontSize = (16.sp * sizeText),
                         fontWeight = FontWeight.Bold,
-                        color = if (highContrast) Color.White else Color.Black
+                        color = if (contrast) backgroundColor else textColor
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
                         "Este é um exemplo de como os textos ficarão com suas preferências.",
-                        fontSize = (14.sp * fontScale),
-                        color = if (highContrast) Color.White else Color.Black
+                        fontSize = (14.sp * sizeText),
+                        color = if (contrast) backgroundColor else textColor
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
                         "Títulos, botões e conteúdos se adaptam ao tamanho e contraste.",
-                        fontSize = (14.sp * fontScale),
-                        color = if (highContrast) Color.White else Color.Black
+                        fontSize = (14.sp * sizeText),
+                        color = if (contrast) backgroundColor else textColor
                     )
                 }
             }
 
             Spacer(Modifier.height(24.dp))
 
-            // Ações do footer
+            // Footer
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(
                     onClick = { sfx.play(Sfx.CLICK); onBack() },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Voltar")
+                    Text("Voltar", color = textColor)
                 }
                 Button(
                     onClick = {
                         sfx.play(Sfx.CLICK)
-                        onApply(darkMode, highContrast, fontScale)
-                        onBack()
+                        viewModel.setDarkMode(darkMode)
+                        viewModel.setContrastText(contrast)
+                        viewModel.setSizeText(sizeText)
+                        onApply(darkMode, contrast, sizeText)
                     },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
@@ -251,7 +262,8 @@ private fun SettingSwitchRow(
     title: String,
     subtitle: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    textColor: Color
 ) {
     Row(
         modifier = Modifier
@@ -262,9 +274,9 @@ private fun SettingSwitchRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = Color.Black)
+            Text(title, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = textColor)
             Spacer(Modifier.height(2.dp))
-            Text(subtitle, fontSize = 13.sp, color = Color.Black.copy(alpha = 0.7f))
+            Text(subtitle, fontSize = 13.sp, color = textColor.copy(alpha = 0.7f))
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }

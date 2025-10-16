@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -37,6 +38,11 @@ import com.recuperavc.models.Phrase
 import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.math.roundToInt
+import com.recuperavc.models.SettingsViewModel
+import com.recuperavc.ui.factory.SettingsViewModelFactory
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.collectAsState
+
 
 /* ------------------------- Cores ---------------------------- */
 private val Olive = Color(0xFF5E6F48)
@@ -63,11 +69,17 @@ fun SentenceArrangeMultiRound(
     context: Context,
     phrases: List<Phrase>,
     onBack: () -> Unit = {},
-    onFinished: (List<RoundResult>) -> Unit
+    onFinished: (List<RoundResult>) -> Unit,
+    viewModel: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(LocalContext.current))
 ) {
     val totalRounds = 3
     var currentRound by rememberSaveable { mutableStateOf(0) }
     val results = remember { mutableStateListOf<RoundResult>() }
+
+    val darkMode by viewModel.darkModeFlow.collectAsState(initial = false)
+    val contrast by viewModel.contrastFlow.collectAsState(initial = false)
+    val fontScale by viewModel.sizeTextFlow.collectAsState(initial = 1.0f)
+
 
     BackHandler(enabled = true) { onBack() }
 
