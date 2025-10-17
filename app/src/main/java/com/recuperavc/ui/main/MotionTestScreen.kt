@@ -33,6 +33,11 @@ import kotlin.math.roundToInt
 import kotlin.random.Random
 import com.recuperavc.ui.sfx.Sfx
 import com.recuperavc.ui.sfx.rememberSfxController
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 
 private enum class MotionMode { MOVING, STATIC }
 private enum class Hand { RIGHT, LEFT }
@@ -342,57 +347,87 @@ fun MotionTestScreen(
 
         // RESULTADOS
         if (finished) {
-            Column(
+            val scrollState = rememberScrollState()
+
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.Top,
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .background(Color.White)
             ) {
-                Text("Fim do teste!", fontSize = 22.sp, color = GreenDark)
-                Spacer(Modifier.height(12.dp))
+                // Scrollable content
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = 16.dp)
+                        // leave room for the bottom action bar so last items aren't behind it
+                        .padding(top = 16.dp, bottom = 96.dp),
+                    verticalArrangement = Arrangement.Top,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("Fim do teste!", fontSize = 22.sp, color = GreenDark)
+                    Spacer(Modifier.height(12.dp))
 
-                lastReport?.let { report ->
-                    ReportCard(report)
-                    Spacer(Modifier.height(16.dp))
-                }
+                    lastReport?.let { report ->
+                        ReportCard(report)
+                        Spacer(Modifier.height(16.dp))
+                    }
 
-                Divider(thickness = 1.dp, color = Color(0xFFE0E0E0))
-                Spacer(Modifier.height(12.dp))
+                    Divider(thickness = 1.dp, color = Color(0xFFE0E0E0))
+                    Spacer(Modifier.height(12.dp))
 
-                if (history.isNotEmpty()) {
-                    Text("Relatórios recentes", fontSize = 18.sp, color = GreenDark)
-                    Spacer(Modifier.height(8.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        history.take(5).forEach { r -> SmallReportRow(r) }
+                    if (history.isNotEmpty()) {
+                        Text("Relatórios recentes", fontSize = 18.sp, color = GreenDark)
+                        Spacer(Modifier.height(8.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            history.take(5).forEach { r -> SmallReportRow(r) }
+                        }
                     }
                 }
 
-                Spacer(Modifier.height(24.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(
-                        onClick = {
-                            sfx.play(Sfx.CLICK)
-                            // Reset total para novo teste
-                            selectedHand = null
-                            isDominant = null
-                            chosenMode = null
-                            testStarted = false
-                            finished = false
-                            clicks = 0
-                            missedClicks = 0
-                            timeLeft = durationSecondsWithMovement
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = GreenAccent)
-                    ) { Text("Novo teste", color = Color.White) }
+                // Sticky bottom actions
+                Surface(
+                    tonalElevation = 3.dp,
+                    shadowElevation = 6.dp,
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            // respect gesture nav / system bar insets
+                            .windowInsetsPadding(WindowInsets.navigationBars)
+                    ) {
+                        Button(
+                            onClick = {
+                                sfx.play(Sfx.CLICK)
+                                // Reset total para novo teste
+                                selectedHand = null
+                                isDominant = null
+                                chosenMode = null
+                                testStarted = false
+                                finished = false
+                                clicks = 0
+                                missedClicks = 0
+                                timeLeft = durationSecondsWithMovement
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = GreenAccent),
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Novo teste", color = Color.White) }
 
-                    Button(
-                        onClick = {
-                            sfx.play(Sfx.CLICK)
-                            onBack()
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
-                    ) { Text("Voltar", color = Color.White) }
+                        Button(
+                            onClick = {
+                                sfx.play(Sfx.CLICK)
+                                onBack()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = GreenDark),
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Voltar", color = Color.White) }
+                    }
                 }
             }
         }

@@ -15,9 +15,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.Divider
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Gesture
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Psychology
@@ -53,6 +56,7 @@ import com.recuperavc.ui.theme.GreenLight
 import com.recuperavc.ui.theme.OnBackground
 import com.recuperavc.ui.sfx.Sfx
 import com.recuperavc.ui.sfx.rememberSfxController
+import com.recuperavc.ui.components.RecuperAVCBrandHeader
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -86,6 +90,7 @@ fun HomeScreen(
                 drawerContainerColor = GreenLight,
                 drawerContentColor = Color.White
             ) {
+                // Header wave
                 Box(modifier = Modifier.fillMaxWidth().height(100.dp)) {
                     Image(
                         painter = painterResource(id = R.drawable.wave_light),
@@ -102,7 +107,7 @@ fun HomeScreen(
                     onClick = {
                         navigateWithClick {
                             onOpenReports()
-                            // fechar o drawer após navegar é opcional; depende do seu NavHost
+                            // fechar o drawer após navegar é opcional, depende do seu NavHost
                             scope.launch { drawerState.close() }
                         }
                     },
@@ -136,6 +141,36 @@ fun HomeScreen(
                         unselectedIconColor = Color.White
                     )
                 )
+
+                Spacer(Modifier.weight(1f))
+                Divider(color = Color.White.copy(alpha = 0.2f))
+                NavigationDrawerItem(
+                    label = { Text("Sair") },
+                    selected = false,
+                    onClick = {
+                        navigateWithClick {
+                            onExit()
+                            scope.launch { drawerState.close() }
+                        }
+                    },
+                    icon = {
+                        Icon(
+                            Icons.Default.Logout,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp), // small icon
+                            tint = Color.White
+                        )
+                    },
+                    colors = NavigationDrawerItemDefaults.colors(
+                        selectedContainerColor = Color.White.copy(alpha = 0.12f),
+                        unselectedContainerColor = Color.Transparent,
+                        selectedTextColor = Color.White,
+                        unselectedTextColor = Color.White,
+                        selectedIconColor = Color.White,
+                        unselectedIconColor = Color.White
+                    )
+                )
+                Spacer(Modifier.height(8.dp))
             }
         }
     ) {
@@ -163,11 +198,6 @@ fun HomeScreen(
                     }) {
                         Icon(Icons.Default.Menu, contentDescription = null, tint = OnBackground)
                     }
-                    IconButton(onClick = {
-                        navigateWithClick(onExit)
-                    }) {
-                        Icon(Icons.Default.Close, contentDescription = null, tint = OnBackground)
-                    }
                 }
             }
 
@@ -178,6 +208,10 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.Top,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                Spacer(Modifier.height(16.dp))
+                RecuperAVCBrandHeader()
+                Spacer(Modifier.height(58.dp))
+
                 ActionCard(
                     title = "Teste de raciocínio",
                     icon = Icons.Default.Psychology,
@@ -211,7 +245,10 @@ private fun ActionCard(
             .fillMaxWidth()
             .height(96.dp)
             .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = GreenLight.copy(alpha = 0.9f)),
+        colors = CardDefaults.cardColors(
+            containerColor = GreenLight,
+            contentColor = Color.White
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
         shape = RoundedCornerShape(12.dp)
     ) {

@@ -1,6 +1,8 @@
 package com.recuperavc.models
 
 import androidx.room.*
+import java.time.Instant
+import java.util.Date
 import java.util.UUID
 
 @Entity(
@@ -21,5 +23,6 @@ data class CoherenceReport(
     val averageErrorsPerTry: Float,
     val averageTimePerTry: Float,
     val allTestsDescription: String,
+    val date: Instant,
     @ColumnInfo(name = "fk_Phrase_id") val phraseId: UUID?
 )

@@ -43,7 +43,6 @@ import com.recuperavc.ui.factory.SettingsViewModelFactory
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.collectAsState
 
-
 /* ------------------------- Cores ---------------------------- */
 private val Olive = Color(0xFF5E6F48)
 private val OliveDark = Color(0xFF4C5C3A)
@@ -79,7 +78,6 @@ fun SentenceArrangeMultiRound(
     val darkMode by viewModel.darkModeFlow.collectAsState(initial = false)
     val contrast by viewModel.contrastFlow.collectAsState(initial = false)
     val fontScale by viewModel.sizeTextFlow.collectAsState(initial = 1.0f)
-
 
     BackHandler(enabled = true) { onBack() }
 
@@ -302,12 +300,15 @@ fun SentenceArrange(
                 scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                     val db = DbProvider.db(context)
                     val count = finalResults.size
-                    val avgTimeUntilCorrectSec = if (count > 0) finalResults.map { it.timeElapsed }.average().toFloat() / 1000f else 0f
-                    val avgTries = if (count > 0) finalResults.map { it.tries.size }.average().toFloat() else 0f
-                    val successRate = if (count > 0) finalResults.count { it.correct }.toFloat() / count.toFloat() else 0f
+                    val avgTimeUntilCorrectSec =
+                        if (count > 0) finalResults.map { it.timeElapsed }.average().toFloat() / 1000f else 0f
+                    val avgTries =
+                        if (count > 0) finalResults.map { it.tries.size }.average().toFloat() else 0f
+                    val successRate =
+                        if (count > 0) finalResults.count { it.correct }.toFloat() / count.toFloat() else 0f
                     val reportId = java.util.UUID.randomUUID()
                     val mainPhraseId = finalResults.firstOrNull()?.phraseId
-                    val savedAt = System.currentTimeMillis()
+
                     val attemptsArray = org.json.JSONArray().apply {
                         finalResults.forEach { r ->
                             val triesArr = org.json.JSONArray().apply {
@@ -328,21 +329,24 @@ fun SentenceArrange(
                             })
                         }
                     }
+
                     val desc = org.json.JSONObject().apply {
                         put("count", count)
                         put("avgTimeUntilCorrectSec", avgTimeUntilCorrectSec)
                         put("avgTries", avgTries)
                         put("successRate", successRate)
-                        put("savedAtEpochMs", savedAt)
                         put("attempts", attemptsArray)
                     }.toString()
+
                     val report = CoherenceReport(
                         id = reportId,
                         averageErrorsPerTry = avgTries,
                         averageTimePerTry = avgTimeUntilCorrectSec,
                         allTestsDescription = desc,
+                        date = java.time.Instant.now(), // ✅ store timestamp here
                         phraseId = mainPhraseId
                     )
+
                     db.coherenceReportDao().upsert(report)
                     finalResults.map { it.phraseId }.distinct().forEach { pid ->
                         db.coherenceReportDao().link(
