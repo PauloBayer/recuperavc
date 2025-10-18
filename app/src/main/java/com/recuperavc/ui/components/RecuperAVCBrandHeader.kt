@@ -83,7 +83,7 @@ fun RecuperAVCBrandHeader() {
                 Spacer(Modifier.height(6.dp))
 
                 Text(
-                    text = "Voz • Frases • Coordenação",
+                    text = "Frases • Voz • Coordenação",
                     color = GreenDark.copy(alpha = 0.75f),
                     fontSize = 13.sp,
                     textAlign = TextAlign.Center
