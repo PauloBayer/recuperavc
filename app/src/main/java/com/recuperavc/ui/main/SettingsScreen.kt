@@ -1,5 +1,6 @@
 package com.recuperavc.ui.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -35,22 +36,18 @@ fun SettingsScreen(
     onApply: (darkMode: Boolean, contrast: Boolean, fontScale: Float) -> Unit = { _, _, _ -> }
 ) {
     val context = LocalContext.current
-    val viewModel: SettingsViewModel = viewModel(
-        factory = SettingsViewModelFactory(context)
-    )
-
+    val viewModel: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context))
     val sfx = rememberSfxController()
 
-    // Observando os estados do ViewModel
+    // Observe VM
     val darkMode by viewModel.darkModeFlow.collectAsState(initial = false)
     val contrast by viewModel.contrastFlow.collectAsState(initial = false)
     val sizeText by viewModel.sizeTextFlow.collectAsState(initial = 1.0f)
 
-    // Slider temporário
     var sliderValue by remember { mutableStateOf(sizeText) }
     LaunchedEffect(sizeText) { sliderValue = sizeText }
 
-    // Aplicando o tema responsivo
+    // Colors based on prefs
     val backgroundColor = when {
         contrast -> Color.Black
         darkMode -> Color(0xFF121212)
@@ -58,10 +55,22 @@ fun SettingsScreen(
     }
     val textColor = if (contrast || darkMode) Color.White else Color.Black
 
+    // Handle system back
+    BackHandler(enabled = true) {
+        sfx.play(Sfx.CLICK)
+        onBack()
+    }
+
+    val headerHeight = 160.dp
+
     Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
 
-        // Header
-        Box(modifier = Modifier.fillMaxWidth().height(160.dp)) {
+        // HEADER (drawn at the very top)
+        Box(modifier = Modifier
+            .fillMaxWidth()
+            .height(headerHeight)
+        ) {
+            // Green wave-ish header
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
@@ -83,23 +92,31 @@ fun SettingsScreen(
                 }
                 drawPath(path, color = GreenLight)
             }
+
+            // Back arrow — same look as ReportsScreen
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.statusBars)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.Start,
                 verticalAlignment = Alignment.Top
             ) {
                 IconButton(onClick = { sfx.play(Sfx.CLICK); onBack() }) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = null, tint = textColor)
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = null,
+                        tint = OnBackground
+                    )
                 }
             }
         }
 
+        // CONTENT — shifted *below* the header so it does not cover the arrow
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(top = headerHeight, start = 16.dp, end = 16.dp, bottom = 16.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -111,7 +128,7 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(16.dp))
 
-            // Card da aparência
+            // Aparência
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -150,7 +167,7 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            // Card de tamanho de texto
+            // Tamanho do texto
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -198,7 +215,7 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            // Texto de pré-visualização
+            // Pré-visualização
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -229,29 +246,19 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(24.dp))
 
-            // Footer
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(
-                    onClick = { sfx.play(Sfx.CLICK); onBack() },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Voltar", color = textColor)
-                }
-                Button(
-                    onClick = {
-                        sfx.play(Sfx.CLICK)
-                        viewModel.setDarkMode(darkMode)
-                        viewModel.setContrastText(contrast)
-                        viewModel.setSizeText(sizeText)
-                        onApply(darkMode, contrast, sizeText)
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
-                ) {
-                    Text("Aplicar", color = Color.White)
-                }
+            Button(
+                onClick = {
+                    sfx.play(Sfx.CLICK)
+                    viewModel.setDarkMode(darkMode)
+                    viewModel.setContrastText(contrast)
+                    viewModel.setSizeText(sizeText)
+                    onApply(darkMode, contrast, sizeText)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
+            ) {
+                Text("Aplicar", color = Color.White)
             }
         }
     }

@@ -4,10 +4,44 @@ import android.annotation.SuppressLint
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Divider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -33,11 +67,6 @@ import kotlin.math.roundToInt
 import kotlin.random.Random
 import com.recuperavc.ui.sfx.Sfx
 import com.recuperavc.ui.sfx.rememberSfxController
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 
 private enum class MotionMode { MOVING, STATIC }
 private enum class Hand { RIGHT, LEFT }
@@ -178,6 +207,28 @@ fun MotionTestScreen(
             }
         }
 
+        // ===== SETA VERDE NO PRÉ-TESTE (substitui o botão Voltar) =====
+        if (!testStarted && !finished) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { sfx.play(Sfx.CLICK); onBack() }
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.ArrowBack,
+                        contentDescription = "Voltar",
+                        tint = GreenDark
+                    )
+                }
+            }
+        }
+
         // TELA DE PRÉ-TESTE
         if (!testStarted && !finished) {
             Column(
@@ -283,14 +334,7 @@ fun MotionTestScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Começar teste", color = Color.White) }
 
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = {
-                        sfx.play(Sfx.CLICK) // feedback no voltar
-                        onBack()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Voltar") }
+                // (REMOVIDO) botão Outlined "Voltar" do pré-teste
             }
             return@BoxWithConstraints
         }
@@ -354,13 +398,13 @@ fun MotionTestScreen(
                     .fillMaxSize()
                     .background(Color.White)
             ) {
-                // Scrollable content
+                // Conteúdo com scroll
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(scrollState)
                         .padding(horizontal = 16.dp)
-                        // leave room for the bottom action bar so last items aren't behind it
+                        // deixa espaço pro action bar fixo
                         .padding(top = 16.dp, bottom = 96.dp),
                     verticalArrangement = Arrangement.Top,
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -385,7 +429,7 @@ fun MotionTestScreen(
                     }
                 }
 
-                // Sticky bottom actions
+                // Barra de ações fixa no rodapé
                 Surface(
                     tonalElevation = 3.dp,
                     shadowElevation = 6.dp,
@@ -399,7 +443,7 @@ fun MotionTestScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp)
-                            // respect gesture nav / system bar insets
+                            // respeita os insets da navegação por gestos
                             .windowInsetsPadding(WindowInsets.navigationBars)
                     ) {
                         Button(
