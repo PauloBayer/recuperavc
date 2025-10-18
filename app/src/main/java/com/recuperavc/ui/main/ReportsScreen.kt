@@ -1,7 +1,21 @@
 package com.recuperavc.ui.main
 
+import android.Manifest
 import android.app.DatePickerDialog
+import android.content.ContentValues
+import android.content.Context
+import android.content.pm.PackageManager
+import android.graphics.Paint
+import android.graphics.Typeface
+import android.graphics.pdf.PdfDocument
 import android.media.MediaPlayer
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -26,6 +40,7 @@ import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,14 +54,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.recuperavc.R
 import com.recuperavc.data.db.DbProvider
 import com.recuperavc.models.relations.AudioReportWithFiles
 import com.recuperavc.ui.theme.GreenDark
 import com.recuperavc.ui.theme.GreenLight
 import com.recuperavc.ui.theme.OnBackground
+import com.recuperavc.ui.sfx.Sfx
+import com.recuperavc.ui.sfx.rememberSfxController
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.Instant
 import java.time.LocalDateTime
@@ -54,17 +75,16 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Calendar
-import com.recuperavc.ui.sfx.Sfx
-import com.recuperavc.ui.sfx.rememberSfxController
 
 enum class ChartType { WPM, WER }
 private enum class CoherenceChartType { TIME, ERRORS }
+private enum class ReportTab { Audio, Coherence, Motion }
 
 @Composable
 fun ReportsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val db = remember(context) { DbProvider.db(context) }
-    val sfx = rememberSfxController() // short_pop on every tap
+    val sfx = rememberSfxController()
 
     var tab by remember { mutableStateOf(ReportTab.Audio) }
     var selectedAudioReport by remember { mutableStateOf<Pair<AudioReportWithFiles, ChartType>?>(null) }
@@ -75,6 +95,11 @@ fun ReportsScreen(onBack: () -> Unit) {
     var startDate by remember { mutableStateOf(defaultStartDate) }
     var endDate by remember { mutableStateOf(now) }
     var isDateManuallySet by remember { mutableStateOf(false) }
+
+    val notifPermissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+        ) { }
 
     val rawAudioReports by db.audioReportDao()
         .observeAllWithFiles()
@@ -108,14 +133,12 @@ fun ReportsScreen(onBack: () -> Unit) {
         .collectAsState(initial = emptyList())
 
     val filteredCoherenceReports = remember(coherenceReports, startDate, endDate) {
-        coherenceReports.filter { r ->
-            val groups = parseCoherenceReportGroups(r.allTestsDescription)
-            val savedAt = parseCoherenceReportSavedAt(r.allTestsDescription)
-            groups.isNotEmpty() && savedAt?.let { ts ->
-                val inst = java.time.Instant.ofEpochMilli(ts)
-                inst >= startDate && inst <= endDate
-            } == true
-        }
+        coherenceReports
+            .filter { r ->
+                val groups = parseCoherenceReportGroups(r.allTestsDescription)
+                groups.isNotEmpty() && r.date >= startDate && r.date <= endDate
+            }
+            .sortedBy { it.date }
     }
 
     var phrases by remember { mutableStateOf<List<com.recuperavc.models.Phrase>>(emptyList()) }
@@ -129,7 +152,6 @@ fun ReportsScreen(onBack: () -> Unit) {
                 .fillMaxSize()
                 .background(Color.White)
         ) {
-            // Header
             Box(modifier = Modifier.fillMaxWidth().height(120.dp)) {
                 Image(
                     painter = painterResource(id = R.drawable.wave_green),
@@ -150,7 +172,6 @@ fun ReportsScreen(onBack: () -> Unit) {
                 }
             }
 
-            // Título + Tabs
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -177,7 +198,6 @@ fun ReportsScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(16.dp))
             }
 
-            // Conteúdo scrollável
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -197,7 +217,7 @@ fun ReportsScreen(onBack: () -> Unit) {
                         endDate = it
                         isDateManuallySet = true
                     },
-                    onTapSound = { sfx.play(Sfx.CLICK) } // abre date pickers
+                    onTapSound = { sfx.play(Sfx.CLICK) }
                 )
                 Spacer(Modifier.height(16.dp))
 
@@ -205,7 +225,7 @@ fun ReportsScreen(onBack: () -> Unit) {
                     ReportTab.Audio -> AudioReportSection(
                         items = audioReports,
                         onSelectReport = { report, chartType -> selectedAudioReport = report to chartType },
-                        onBarTapSound = { sfx.play(Sfx.CLICK) } // toque na barra
+                        onBarTapSound = { sfx.play(Sfx.CLICK) }
                     )
                     ReportTab.Coherence -> CoherenceReportSection(
                         items = filteredCoherenceReports,
@@ -214,6 +234,18 @@ fun ReportsScreen(onBack: () -> Unit) {
                     )
                     ReportTab.Motion -> MotionReportSection(motionReports)
                 }
+
+                Spacer(Modifier.height(20.dp))
+                ExportPdfButton(
+                    tab = tab,
+                    startDate = startDate,
+                    endDate = endDate,
+                    audioReports = audioReports,
+                    coherenceReports = filteredCoherenceReports,
+                    motionReports = motionReports,
+                    onTapSound = { sfx.play(Sfx.CLICK) }
+                )
+                Spacer(Modifier.height(32.dp))
             }
         }
 
@@ -222,7 +254,7 @@ fun ReportsScreen(onBack: () -> Unit) {
                 report = rep,
                 chartType = chartType,
                 onDismiss = { selectedAudioReport = null },
-                onAnyTap = { sfx.play(Sfx.CLICK) } // fundo, play/pause, fechar
+                onAnyTap = { sfx.play(Sfx.CLICK) }
             )
         }
 
@@ -237,8 +269,6 @@ fun ReportsScreen(onBack: () -> Unit) {
         }
     }
 }
-
-private enum class ReportTab { Audio, Coherence, Motion }
 
 @Composable
 private fun SegmentedTabs(tab: ReportTab, onTab: (ReportTab) -> Unit) {
@@ -599,7 +629,6 @@ private fun AudioReportDetailDialog(
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.6f))
             .pointerInput(Unit) {
-                // click fora fecha
                 detectTapGestures {
                     onAnyTap()
                     onDismiss()
@@ -611,7 +640,7 @@ private fun AudioReportDetailDialog(
                 .fillMaxWidth()
                 .padding(24.dp)
                 .align(Alignment.Center)
-                .pointerInput(Unit) { /* captura toques internos */ },
+                .pointerInput(Unit) { },
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
@@ -964,10 +993,8 @@ private fun CoherenceReportSection(
     val pointsTime = items.map { it.averageTimePerTry }
     val pointsErrors = items.map { it.averageErrorsPerTry }
     val labels = items.map { r ->
-        parseCoherenceReportSavedAt(r.allTestsDescription)?.let { ts ->
-            val local = java.time.LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(ts), java.time.ZoneId.systemDefault())
-            java.time.format.DateTimeFormatter.ofPattern("dd/MM").format(local)
-        } ?: ""
+        val local = LocalDateTime.ofInstant(r.date, ZoneId.systemDefault())
+        DateTimeFormatter.ofPattern("dd/MM").format(local)
     }
 
     if (items.isEmpty()) {
@@ -1040,7 +1067,7 @@ private fun CoherenceReportDetailDialog(
     onAnyTap: () -> Unit
 ) {
     val groups = remember(report.allTestsDescription) { parseCoherenceReportGroups(report.allTestsDescription) }
-    val savedAt = remember(report.allTestsDescription) { parseCoherenceReportSavedAt(report.allTestsDescription) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1076,15 +1103,13 @@ private fun CoherenceReportDetailDialog(
                             fontSize = 24.sp,
                             color = GreenDark
                         )
-                        if (savedAt != null) {
-                            val local = java.time.LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(savedAt), java.time.ZoneId.systemDefault())
-                            Text(
-                                java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy 'às' HH:mm").format(local),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.Black.copy(alpha = 0.6f)
-                            )
-                        }
+                        val local = LocalDateTime.ofInstant(report.date, ZoneId.systemDefault())
+                        Text(
+                            DateTimeFormatter.ofPattern("dd/MM/yyyy 'às' HH:mm").format(local),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.Black.copy(alpha = 0.6f)
+                        )
                     }
                     Icon(
                         Icons.Default.TrendingUp,
@@ -1443,17 +1468,6 @@ private fun parseCoherenceReportGroups(desc: String): List<CoherencePhraseGroup>
     }
 }
 
-private fun parseCoherenceReportSavedAt(desc: String): Long? {
-    return try {
-        val root = org.json.JSONObject(desc)
-        if (!root.has("savedAtEpochMs")) return null
-        root.optLong("savedAtEpochMs", 0L).takeIf { it > 0L }
-    } catch (_: Exception) {
-        null
-    }
-}
-
-
 @Composable
 private fun ChartCard(title: String, subtitle: String, content: @Composable () -> Unit) {
     Card(
@@ -1490,10 +1504,6 @@ private fun ChartCard(title: String, subtitle: String, content: @Composable () -
     }
 }
 
-/**
- * Gráfico de barras com rolagem horizontal + rótulos sincronizados
- * e eixo Y fixo à esquerda. Clique por barra opcional.
- */
 @Composable
 private fun BarChart(
     points: List<Float>,
@@ -1512,14 +1522,10 @@ private fun BarChart(
     val maxY = (points.maxOrNull() ?: 1f).coerceAtLeast(1f)
     val minY = 0f
     val scrollState = rememberScrollState()
-    val barWidthDp = 64 // ajuste fino do tamanho das barras
+    val barWidthDp = 64
 
     Column(modifier = Modifier.fillMaxSize()) {
-
-        // Área principal: eixo Y fixo + barras com scroll
         Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
-
-            // Eixo Y
             Column(
                 modifier = Modifier
                     .width(48.dp)
@@ -1574,7 +1580,6 @@ private fun BarChart(
                 )
             }
 
-            // Barras (scroll sincronizado com labels)
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -1619,9 +1624,8 @@ private fun BarChart(
 
         Spacer(Modifier.height(8.dp))
 
-        // Rótulos (eixo X) — usam o mesmo scrollState das barras
         Row(modifier = Modifier.fillMaxWidth()) {
-            Spacer(Modifier.width(48.dp)) // compensar eixo Y
+            Spacer(Modifier.width(48.dp))
             Row(
                 modifier = Modifier
                     .weight(1f)
@@ -1694,4 +1698,321 @@ private fun parseAudioReportDetails(desc: String): List<Attempt> {
     } catch (_: Exception) {
         emptyList()
     }
+}
+
+/* ---------------- PDF Export ---------------- */
+@Composable
+private fun ExportPdfButton(
+    tab: ReportTab,
+    startDate: Instant,
+    endDate: Instant,
+    audioReports: List<AudioReportWithFiles>,
+    coherenceReports: List<com.recuperavc.models.CoherenceReport>,
+    motionReports: List<com.recuperavc.models.MotionReport>,
+    onTapSound: (() -> Unit)? = null
+) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // Launcher for WRITE_EXTERNAL_STORAGE (pre-29)
+    val storageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { /* we re-run export in onClick after permission */ }
+
+    // Launcher for POST_NOTIFICATIONS (API 33+)
+    val notifLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { /* no-op; we’ll try to show the notification right after export */ }
+
+    Button(
+        onClick = {
+            onTapSound?.invoke()
+
+            // Pre-29: ask for legacy storage permission if needed
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                val perm = Manifest.permission.WRITE_EXTERNAL_STORAGE
+                if (ContextCompat.checkSelfPermission(ctx, perm) != PackageManager.PERMISSION_GRANTED) {
+                    storageLauncher.launch(perm)
+                    return@Button
+                }
+            }
+            // 33+: ask for notification permission (best-effort)
+            if (Build.VERSION.SDK_INT >= 33) {
+                val perm = Manifest.permission.POST_NOTIFICATIONS
+                if (ContextCompat.checkSelfPermission(ctx, perm) != PackageManager.PERMISSION_GRANTED) {
+                    notifLauncher.launch(perm)
+                }
+            }
+
+            scope.launch(Dispatchers.IO) {
+                val uri = exportReportsToPdf(ctx, tab, startDate, endDate, audioReports, coherenceReports, motionReports)
+                withContext(Dispatchers.Main) {
+                    if (uri != null) {
+                        val fileName = buildReportFileName(tab, startDate, endDate)
+                        com.recuperavc.util.ExportNotification.notifyPdfSaved(ctx, uri, fileName)
+                        // (opcional) ainda mostra um toast
+                        Toast.makeText(ctx, "PDF salvo em Downloads/RecuperAVC.", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(ctx, "Falha ao salvar PDF.", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        },
+        colors = ButtonDefaults.buttonColors(containerColor = GreenDark),
+        modifier = Modifier.fillMaxWidth().height(52.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Icon(Icons.Default.Description, contentDescription = null, tint = Color.White)
+        Spacer(Modifier.width(8.dp))
+        Text("Exportar PDF", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+// ===== PDF export (fixed: no unresolved reference) =========================
+private fun exportReportsToPdf(
+    context: android.content.Context,
+    tab: ReportTab,
+    startDate: java.time.Instant,
+    endDate: java.time.Instant,
+    audioReports: List<com.recuperavc.models.relations.AudioReportWithFiles>,
+    coherenceReports: List<com.recuperavc.models.CoherenceReport>,
+    motionReports: List<com.recuperavc.models.MotionReport>
+): android.net.Uri? {
+    val doc = android.graphics.pdf.PdfDocument()
+
+    // A4 page @ ~72dpi
+    val pageW = 595
+    val pageH = 842
+    val margin = 32
+
+    var pageNo = 1
+    var y = margin
+
+    // Page & canvas holders must exist before helpers
+    var currentPage: android.graphics.pdf.PdfDocument.Page? = null
+    var canvas: android.graphics.Canvas? = null
+
+    val titlePaint = android.graphics.Paint().apply {
+        isAntiAlias = true
+        textSize = 18f
+        typeface = android.graphics.Typeface.create(
+            android.graphics.Typeface.DEFAULT_BOLD,
+            android.graphics.Typeface.BOLD
+        )
+        color = android.graphics.Color.BLACK
+    }
+    val subPaint = android.graphics.Paint().apply {
+        isAntiAlias = true
+        textSize = 12f
+        color = android.graphics.Color.DKGRAY
+    }
+    val textPaint = android.graphics.Paint().apply {
+        isAntiAlias = true
+        textSize = 12f
+        color = android.graphics.Color.BLACK
+    }
+    val greenPaint = android.graphics.Paint().apply {
+        isAntiAlias = true
+        textSize = 12f
+        // approx your GreenDark
+        color = android.graphics.Color.rgb(34, 99, 57)
+    }
+
+    fun newPage() {
+        val info = android.graphics.pdf.PdfDocument.PageInfo.Builder(pageW, pageH, pageNo++).create()
+        currentPage = doc.startPage(info)
+        canvas = currentPage!!.canvas
+        y = margin
+    }
+
+    fun ensureLine(height: Int = 18) {
+        if (y + height > pageH - margin) {
+            currentPage?.let { doc.finishPage(it) }
+            newPage()
+        }
+        y += height
+    }
+
+    fun drawTextLine(text: String, paint: android.graphics.Paint, left: Int = margin) {
+        ensureLine()
+        canvas!!.drawText(text, left.toFloat(), y.toFloat(), paint)
+    }
+
+    fun java.time.Instant.format(pattern: String): String {
+        val ldt = java.time.LocalDateTime.ofInstant(this, java.time.ZoneId.systemDefault())
+        return java.time.format.DateTimeFormatter.ofPattern(pattern).format(ldt)
+    }
+
+    fun sectionHeader(title: String) {
+        ensureLine(16)
+        canvas!!.drawText(title, margin.toFloat(), y.toFloat(), greenPaint)
+        ensureLine(6)
+        canvas!!.drawLine(
+            margin.toFloat(), y.toFloat(),
+            (pageW - margin).toFloat(), y.toFloat(),
+            subPaint
+        )
+        ensureLine(6)
+    }
+
+    // Start first page
+    newPage()
+
+    // Header
+    drawTextLine("RecuperAVC — Relatórios", titlePaint)
+    drawTextLine("Período: ${startDate.format("dd/MM/yyyy")} até ${endDate.format("dd/MM/yyyy")}", subPaint)
+    drawTextLine(
+        "Aba atual: " + when (tab) {
+            ReportTab.Audio -> "Voz"
+            ReportTab.Coherence -> "Raciocínio"
+            ReportTab.Motion -> "Coordenação"
+        },
+        subPaint
+    )
+    ensureLine(12)
+
+    // Content
+    when (tab) {
+        ReportTab.Audio -> {
+            sectionHeader("Relatórios de Voz")
+            if (audioReports.isEmpty()) {
+                drawTextLine("Nenhum relatório no período.", textPaint)
+            } else {
+                audioReports.forEachIndexed { idx, r ->
+                    val minDate = r.files.minOfOrNull { it.recordedAt ?: java.time.Instant.EPOCH } ?: java.time.Instant.EPOCH
+                    drawTextLine("• #${idx + 1}  Data: ${minDate.format("dd/MM/yyyy HH:mm")}", textPaint)
+                    drawTextLine(
+                        "   WPM médio: ${r.report.averageWordsPerMinute.toInt()}  •  Precisão: ${
+                            String.format("%.1f", 100 - r.report.averageWordErrorRate)
+                        }%",
+                        textPaint
+                    )
+                    ensureLine(6)
+                }
+            }
+        }
+        ReportTab.Coherence -> {
+            sectionHeader("Relatórios de Raciocínio")
+            if (coherenceReports.isEmpty()) {
+                drawTextLine("Nenhum relatório no período.", textPaint)
+            } else {
+                coherenceReports.forEachIndexed { idx, r ->
+                    drawTextLine("• #${idx + 1}  Data: ${r.date.format("dd/MM/yyyy HH:mm")}", textPaint)
+                    drawTextLine(
+                        "   Tempo médio: ${String.format("%.1f", r.averageTimePerTry)}s  •  Tentativas médias: ${
+                            String.format("%.1f", r.averageErrorsPerTry)
+                        }",
+                        textPaint
+                    )
+                    ensureLine(6)
+                }
+            }
+        }
+        ReportTab.Motion -> {
+            sectionHeader("Relatórios de Coordenação")
+            if (motionReports.isEmpty()) {
+                drawTextLine("Nenhum relatório no período.", textPaint)
+            } else {
+                motionReports.forEachIndexed { idx, r ->
+                    drawTextLine("• #${idx + 1}  Data: ${r.date.format("dd/MM/yyyy HH:mm")}", textPaint)
+                    drawTextLine(
+                        "   Toques/min: ${r.clicksPerMinute}  •  Total: ${r.totalClicks}  •  Errados: ${r.missedClicks}",
+                        textPaint
+                    )
+                    ensureLine(6)
+                }
+            }
+        }
+    }
+
+    // Finish last page
+    currentPage?.let { doc.finishPage(it) }
+
+    // Filename
+    val fileName = buildString {
+        append("RecuperAVC_")
+        append(
+            when (tab) {
+                ReportTab.Audio -> "Voz_"
+                ReportTab.Coherence -> "Raciocinio_"
+                ReportTab.Motion -> "Coordenacao_"
+            }
+        )
+        append("${startDate.format("yyyyMMdd")}-${endDate.format("yyyyMMdd")}.pdf")
+    }
+
+    return try {
+        val resultUri: android.net.Uri?
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            // MediaStore path => content:// always
+            val values = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
+                put(
+                    android.provider.MediaStore.MediaColumns.RELATIVE_PATH,
+                    android.os.Environment.DIRECTORY_DOWNLOADS + "/RecuperAVC"
+                )
+                put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+            val resolver = context.contentResolver
+            val collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
+            val uri = resolver.insert(collection, values)
+
+            uri?.let {
+                resolver.openOutputStream(it)?.use { out -> doc.writeTo(out) }
+                values.clear()
+                values.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0)
+                resolver.update(it, values, null, null)
+            }
+            resultUri = uri
+        } else {
+            // API < 29 — save to public Downloads and return a **content://** via FileProvider
+            val dir = android.os.Environment.getExternalStoragePublicDirectory(
+                android.os.Environment.DIRECTORY_DOWNLOADS
+            )
+            val folder = java.io.File(dir, "RecuperAVC").apply { mkdirs() }
+            val file = java.io.File(folder, fileName)
+
+            java.io.FileOutputStream(file).use { out -> doc.writeTo(out) }
+
+            // Index for gallery/providers
+            android.media.MediaScannerConnection.scanFile(
+                context,
+                arrayOf(file.absolutePath),
+                arrayOf("application/pdf"),
+                null
+            )
+
+            // IMPORTANT: never return file:// — always content:// using your FileProvider
+            resultUri = androidx.core.content.FileProvider.getUriForFile(
+                context,
+                context.packageName + ".provider",
+                file
+            )
+        }
+        resultUri
+    } catch (_: Exception) {
+        null
+    } finally {
+        try { doc.close() } catch (_: Exception) {}
+    }
+}
+// ==========================================================================
+
+// Nome do PDF exatamente no mesmo padrão usado na exportação
+private fun buildReportFileName(
+    tab: ReportTab,
+    startDate: java.time.Instant,
+    endDate: java.time.Instant
+): String {
+    fun java.time.Instant.fmt(p: String): String {
+        val ldt = java.time.LocalDateTime.ofInstant(this, java.time.ZoneId.systemDefault())
+        return java.time.format.DateTimeFormatter.ofPattern(p).format(ldt)
+    }
+    val kind = when (tab) {
+        ReportTab.Audio -> "Voz_"
+        ReportTab.Coherence -> "Raciocinio_"
+        ReportTab.Motion -> "Coordenacao_"
+    }
+    return "RecuperAVC_${kind}${startDate.fmt("yyyyMMdd")}-${endDate.fmt("yyyyMMdd")}.pdf"
 }
