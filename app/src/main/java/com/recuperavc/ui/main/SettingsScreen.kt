@@ -3,6 +3,9 @@ package com.recuperavc.ui.settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -188,24 +191,91 @@ fun SettingsScreen(
                     Spacer(Modifier.height(8.dp))
 
                     Column {
+
+                        val sliderInteractions = remember { MutableInteractionSource() }
+                        var playedForGesture by remember { mutableStateOf(false) }
+
+                        val min = 0.8f
+                        val max = 1.6f
+                        val step = 0.1f
+                        val stepsCount = ((max - min) / step).toInt() - 1
+                        // Mirror persisted value + track the last "tick" (tenths place)
+                        var sliderValue by remember { mutableStateOf(sizeText) }
+                        var lastTick by remember { mutableStateOf((sizeText * 10f).toInt()) }
+
+                        LaunchedEffect(sizeText) {
+                            sliderValue = sizeText
+                            lastTick = (sizeText * 10f).toInt()
+                        }
+
+                        LaunchedEffect(sliderInteractions) {
+                            sliderInteractions.interactions.collect { interaction ->
+                                when (interaction) {
+                                    is PressInteraction.Press -> {
+                                        if (!playedForGesture) {
+                                            sfx.play(Sfx.CLICK)
+                                            playedForGesture = true
+                                        }
+                                    }
+                                    is PressInteraction.Release,
+                                    is PressInteraction.Cancel -> {
+                                        playedForGesture = false
+                                    }
+                                    is DragInteraction.Start -> {
+                                        if (!playedForGesture) {
+                                            sfx.play(Sfx.CLICK)
+                                            playedForGesture = true
+                                        }
+                                    }
+                                    is DragInteraction.Stop,
+                                    is DragInteraction.Cancel -> {
+                                        playedForGesture = false
+                                    }
+                                }
+                            }
+                        }
+
                         Slider(
                             value = sliderValue,
-                            onValueChange = { sliderValue = it },
-                            valueRange = 0.8f..1.6f,
-                            steps = 7,
+                            onValueChange = { v ->
+                                // Quantize to 0.1f and clamp to the range
+                                val clamped = v.coerceIn(min, max)
+                                val tick = (clamped * 10f).roundToInt()          // 8..16
+                                    .coerceIn((min * 10f).toInt(), (max * 10f).toInt())
+
+                                // Play once per tick change (increase or decrease)
+                                if (tick != lastTick) {
+                                    sfx.play(Sfx.CLICK)
+                                    lastTick = tick
+                                }
+
+                                // Snap slider visually to the discrete tick
+                                sliderValue = tick / 10f
+                            },
+                            valueRange = min..max,
+                            steps = stepsCount,                                  // 7
                             onValueChangeFinished = { viewModel.setSizeText(sliderValue) }
                         )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            TextButton(onClick = { viewModel.setSizeText((sizeText - 0.1f).coerceIn(0.8f, 1.6f)) }) {
+                            TextButton(onClick = {
+                                sfx.play(Sfx.CLICK)
+                                viewModel.setSizeText((sizeText - 0.1f).coerceIn(0.8f, 1.6f))
+                            }) {
                                 Text("A-", color = GreenDark, fontWeight = FontWeight.Bold)
                             }
-                            TextButton(onClick = { viewModel.setSizeText(1.0f) }) {
+                            TextButton(onClick = {
+                                sfx.play(Sfx.CLICK)
+                                viewModel.setSizeText(1.0f)
+                            }) {
                                 Text("Padrão", color = GreenDark, fontWeight = FontWeight.Bold)
                             }
-                            TextButton(onClick = { viewModel.setSizeText((sizeText + 0.1f).coerceIn(0.8f, 1.6f)) }) {
+                            TextButton(onClick = {
+                                sfx.play(Sfx.CLICK)
+                                viewModel.setSizeText((sizeText + 0.1f).coerceIn(0.8f, 1.6f))
+                            }) {
                                 Text("A+", color = GreenDark, fontWeight = FontWeight.Bold)
                             }
                         }
