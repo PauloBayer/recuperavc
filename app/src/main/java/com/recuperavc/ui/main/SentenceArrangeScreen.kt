@@ -42,6 +42,9 @@ import com.recuperavc.models.SettingsViewModel
 import com.recuperavc.ui.factory.SettingsViewModelFactory
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.collectAsState
+import com.recuperavc.ui.sfx.Sfx
+import com.recuperavc.ui.sfx.rememberSfxController
+import com.recuperavc.ui.sfx.withSfx
 
 /* ------------------------- Cores ---------------------------- */
 private val Olive = Color(0xFF5E6F48)
@@ -67,6 +70,7 @@ data class RoundResult(
 fun SentenceArrangeMultiRound(
     context: Context,
     phrases: List<Phrase>,
+    sfx: com.recuperavc.ui.sfx.SfxController,
     onBack: () -> Unit = {},
     onFinished: (List<RoundResult>) -> Unit,
     viewModel: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(LocalContext.current))
@@ -75,28 +79,26 @@ fun SentenceArrangeMultiRound(
     var currentRound by rememberSaveable { mutableStateOf(0) }
     val results = remember { mutableStateListOf<RoundResult>() }
 
-    val darkMode by viewModel.darkModeFlow.collectAsState(initial = false)
-    val contrast by viewModel.contrastFlow.collectAsState(initial = false)
-    val fontScale by viewModel.sizeTextFlow.collectAsState(initial = 1.0f)
-
-    BackHandler(enabled = true) { onBack() }
+    // System back → play once here
+    BackHandler(enabled = true) {
+        sfx.play(Sfx.CLICK)
+        onBack()
+    }
 
     SentenceArrangeScreen(
         context = context,
         phraseEntity = phrases[currentRound],
         round = currentRound + 1,
         totalRounds = totalRounds,
+        sfx = sfx,
         onResult = { result ->
             results.add(result)
-            if (currentRound + 1 < totalRounds) {
-                currentRound++
-            } else {
-                onFinished(results.toList())
-            }
+            if (currentRound + 1 < totalRounds) currentRound++ else onFinished(results.toList())
         },
-        onBack = onBack
+        onBack = { onBack() }
     )
 }
+
 
 /* ------------------------- Tela de Montar Frase ---------------------------- */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -107,6 +109,7 @@ fun SentenceArrangeScreen(
     phraseEntity: Phrase,
     round: Int,
     totalRounds: Int,
+    sfx: com.recuperavc.ui.sfx.SfxController,
     onResult: (RoundResult) -> Unit = {},
     onBack: () -> Unit = {}
 ) {
@@ -117,56 +120,64 @@ fun SentenceArrangeScreen(
     var result by rememberSaveable { mutableStateOf<Boolean?>(null) }
     val startTime = remember(phrase) { System.currentTimeMillis() }
     val tries = remember(phrase) { mutableStateListOf<CoherenceTry>() }
-    val coroutineScope = rememberCoroutineScope()
 
+    // ===== Fundo verde atrás do Scaffold =====
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(ChipLime)
-    )
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Monte a frase ($round/$totalRounds)") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Voltar")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = OliveDark,
-                    navigationIconContentColor = Color.White,
-                    titleContentColor = Color.White
+            .background(Olive)
+    ) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = { Text("Monte a frase ($round/$totalRounds)") },
+                    navigationIcon = {
+                        IconButton(onClick = { sfx.play(Sfx.CLICK); onBack() }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Voltar", tint = Color.White)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = OliveDark,
+                        navigationIconContentColor = Color.White,
+                        titleContentColor = Color.White
+                    )
                 )
-            )
-        },
-        bottomBar = {
-            BottomAppBar(
-                containerColor = OliveDark,
-                actions = {
-                    TextButton(onClick = {
-                        arrangedWords = listOf()
-                        availableWords = words.shuffled()
-                        result = null
-                    }) {
-                        Text("Limpar", color = Color.White)
-                    }
-                },
-                floatingActionButton = {
-                    val canProceed = arrangedWords.isNotEmpty()
-                    val buttonText = if (round == totalRounds) "Enviar" else "Verificar"
+            },
+            bottomBar = {
+                BottomAppBar(
+                    containerColor = OliveDark,
+                    actions = {
+                        TextButton(onClick = {
+                            sfx.play(Sfx.CLICK)
+                            arrangedWords = listOf()
+                            availableWords = words.shuffled()
+                            result = null
+                        }) {
+                            Text("Limpar", color = Color.White)
+                        }
+                    },
+                    floatingActionButton = {
+                        val canProceed = arrangedWords.isNotEmpty()
+                        val buttonText = if (round == totalRounds) "Enviar" else "Verificar"
 
-                    ExtendedFloatingActionButton(
-                        onClick = {
-                            if (canProceed) {
+                        ExtendedFloatingActionButton(
+                            onClick = {
+                                if (!canProceed) {
+                                    sfx.play(Sfx.WRONG_ANSWER)
+                                    return@ExtendedFloatingActionButton
+                                }
+                                sfx.play(Sfx.CLICK)
+
                                 val endTime = System.currentTimeMillis()
                                 val elapsed = endTime - startTime
                                 val typedPhrase = arrangedWords.joinToString(" ")
                                 val correct = typedPhrase == phrase
                                 result = correct
                                 tries.add(CoherenceTry(typedPhrase, correct, elapsed))
+
                                 if (correct) {
+                                    sfx.play(Sfx.RIGHT_ANSWER)
                                     onResult(
                                         RoundResult(
                                             phraseId = phraseEntity.id,
@@ -176,90 +187,95 @@ fun SentenceArrangeScreen(
                                             tries = tries.toList()
                                         )
                                     )
+                                } else {
+                                    sfx.play(Sfx.WRONG_ANSWER)
                                 }
-                            }
-                        },
-                        containerColor = ChipLime,
-                        contentColor = ChipLimeText,
-                        modifier = Modifier.alpha(if (canProceed) 1f else 0.45f)
-                    ) { Text(buttonText) }
-                }
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                text = "Monte a frase:",
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White
-            )
-
+                            },
+                            containerColor = ChipLime,
+                            contentColor = ChipLimeText,
+                            modifier = Modifier.alpha(if (canProceed) 1f else 0.45f)
+                        ) { Text(buttonText) }
+                    }
+                )
+            }
+        ) { padding ->
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(CardTint)
-                    .padding(12.dp)
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                Text(
+                    text = "Monte a frase:",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White
+                )
+
+                // Área de frase montada
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(CardTint) // leve véu branco sobre o verde
+                        .padding(12.dp)
                 ) {
-                    if (arrangedWords.isEmpty()) {
-                        AssistiveHint()
-                    } else {
-                        arrangedWords.forEach { word ->
-                            WordChip(
-                                text = word,
-                                onClick = {
-                                    arrangedWords = arrangedWords - word
-                                    availableWords = availableWords + word
-                                },
-                                shape = RoundedCornerShape(18.dp),
-                                container = ChipMint,
-                                content = ChipMintText
-                            )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (arrangedWords.isEmpty()) {
+                            AssistiveHint()
+                        } else {
+                            arrangedWords.forEach { word ->
+                                WordChip(
+                                    text = word,
+                                    onClick = ({
+                                        arrangedWords = arrangedWords - word
+                                        availableWords = availableWords + word
+                                    }).withSfx(sfx, Sfx.CLICK),
+                                    shape = RoundedCornerShape(18.dp),
+                                    container = ChipMint,
+                                    content = ChipMintText
+                                )
+                            }
                         }
+                    }
+
+                    AnimatedVisibility(
+                        visible = result != null,
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
+                        ResultMessageBox(isCorrect = result == true)
                     }
                 }
 
-                AnimatedVisibility(
-                    visible = result != null,
-                    enter = fadeIn(),
-                    exit = fadeOut()
+                Divider(color = Color.White.copy(alpha = .2f))
+
+                // Palavras disponíveis
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    ResultMessageBox(isCorrect = result == true)
+                    availableWords.forEach { word ->
+                        WordChip(
+                            text = word,
+                            onClick = ({
+                                arrangedWords = arrangedWords + word
+                                availableWords = availableWords - word
+                            }).withSfx(sfx, Sfx.CLICK),
+                            shape = RoundedCornerShape(18.dp),
+                            container = ChipLime,
+                            content = ChipLimeText
+                        )
+                    }
                 }
+
+                Spacer(Modifier.height(64.dp))
             }
-
-            Divider(color = Color.White.copy(alpha = .2f))
-
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                availableWords.forEach { word ->
-                    WordChip(
-                        text = word,
-                        onClick = {
-                            arrangedWords = arrangedWords + word
-                            availableWords = availableWords - word
-                        },
-                        shape = RoundedCornerShape(18.dp),
-                        container = ChipLime,
-                        content = ChipLimeText
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(64.dp))
         }
     }
 }
@@ -270,6 +286,8 @@ fun SentenceArrange(
     context: Context,
     onBackToHome: () -> Unit = {}
 ) {
+    val sfx = rememberSfxController()
+
     var phrases by remember { mutableStateOf<List<Phrase>>(emptyList()) }
     var showResults by rememberSaveable { mutableStateOf(false) }
     val results = remember { mutableStateListOf<RoundResult>() }
@@ -285,8 +303,13 @@ fun SentenceArrange(
         SentenceResultScreen(
             phrases = results.map { phraseMap[it.phraseId]?.description ?: "" },
             results = results,
-            onBackToHome = onBackToHome,
+            sfx = sfx,
+            onBackToHome = {
+                sfx.play(Sfx.CLICK)
+                onBackToHome()
+            },
             onRestart = {
+                sfx.play(Sfx.CLICK)
                 results.clear()
                 showResults = false
             }
@@ -295,7 +318,10 @@ fun SentenceArrange(
         SentenceArrangeMultiRound(
             context = context,
             phrases = phrases,
-            onBack = onBackToHome,
+            sfx = sfx,
+            onBack = {
+                onBackToHome()
+            },
             onFinished = { finalResults ->
                 scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                     val db = DbProvider.db(context)
@@ -343,7 +369,7 @@ fun SentenceArrange(
                         averageErrorsPerTry = avgTries,
                         averageTimePerTry = avgTimeUntilCorrectSec,
                         allTestsDescription = desc,
-                        date = java.time.Instant.now(), // ✅ store timestamp here
+                        date = java.time.Instant.now(),
                         phraseId = mainPhraseId
                     )
 
@@ -446,6 +472,7 @@ private fun ResultMessageBox(isCorrect: Boolean) {
 fun SentenceResultScreen(
     phrases: List<String>,
     results: List<RoundResult>,
+    sfx: com.recuperavc.ui.sfx.SfxController,
     onBackToHome: () -> Unit = {},
     onRestart: () -> Unit = {}
 ) {
@@ -510,7 +537,7 @@ fun SentenceResultScreen(
                 Spacer(Modifier.height(20.dp))
 
                 Button(
-                    onClick = onRestart,
+                    onClick = { sfx.play(Sfx.CLICK); onRestart() },
                     colors = ButtonDefaults.buttonColors(containerColor = ChipLime),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp)
@@ -521,7 +548,7 @@ fun SentenceResultScreen(
                 Spacer(Modifier.height(8.dp))
 
                 Button(
-                    onClick = onBackToHome,
+                    onClick = { sfx.play(Sfx.CLICK); onBackToHome() },
                     colors = ButtonDefaults.buttonColors(containerColor = OliveDark),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp)
