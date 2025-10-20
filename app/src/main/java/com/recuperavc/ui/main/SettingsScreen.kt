@@ -1,7 +1,11 @@
 package com.recuperavc.ui.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,22 +39,18 @@ fun SettingsScreen(
     onApply: (darkMode: Boolean, contrast: Boolean, fontScale: Float) -> Unit = { _, _, _ -> }
 ) {
     val context = LocalContext.current
-    val viewModel: SettingsViewModel = viewModel(
-        factory = SettingsViewModelFactory(context)
-    )
-
+    val viewModel: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context))
     val sfx = rememberSfxController()
 
-    // Observando os estados do ViewModel
+    // Observe VM
     val darkMode by viewModel.darkModeFlow.collectAsState(initial = false)
     val contrast by viewModel.contrastFlow.collectAsState(initial = false)
     val sizeText by viewModel.sizeTextFlow.collectAsState(initial = 1.0f)
 
-    // Slider temporário
     var sliderValue by remember { mutableStateOf(sizeText) }
     LaunchedEffect(sizeText) { sliderValue = sizeText }
 
-    // Aplicando o tema responsivo
+    // Colors based on prefs
     val backgroundColor = when {
         contrast -> Color.Black
         darkMode -> Color(0xFF121212)
@@ -58,10 +58,22 @@ fun SettingsScreen(
     }
     val textColor = if (contrast || darkMode) Color.White else Color.Black
 
+    // Handle system back
+    BackHandler(enabled = true) {
+        sfx.play(Sfx.CLICK)
+        onBack()
+    }
+
+    val headerHeight = 160.dp
+
     Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
 
-        // Header
-        Box(modifier = Modifier.fillMaxWidth().height(160.dp)) {
+        // HEADER (drawn at the very top)
+        Box(modifier = Modifier
+            .fillMaxWidth()
+            .height(headerHeight)
+        ) {
+            // Green wave-ish header
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
@@ -83,23 +95,31 @@ fun SettingsScreen(
                 }
                 drawPath(path, color = GreenLight)
             }
+
+            // Back arrow — same look as ReportsScreen
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.statusBars)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.Start,
                 verticalAlignment = Alignment.Top
             ) {
                 IconButton(onClick = { sfx.play(Sfx.CLICK); onBack() }) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = null, tint = textColor)
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = null,
+                        tint = OnBackground
+                    )
                 }
             }
         }
 
+        // CONTENT — shifted *below* the header so it does not cover the arrow
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(top = headerHeight, start = 16.dp, end = 16.dp, bottom = 16.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -111,7 +131,7 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(16.dp))
 
-            // Card da aparência
+            // Aparência
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -150,7 +170,7 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            // Card de tamanho de texto
+            // Tamanho do texto
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -171,24 +191,91 @@ fun SettingsScreen(
                     Spacer(Modifier.height(8.dp))
 
                     Column {
+
+                        val sliderInteractions = remember { MutableInteractionSource() }
+                        var playedForGesture by remember { mutableStateOf(false) }
+
+                        val min = 0.8f
+                        val max = 1.6f
+                        val step = 0.1f
+                        val stepsCount = ((max - min) / step).toInt() - 1
+                        // Mirror persisted value + track the last "tick" (tenths place)
+                        var sliderValue by remember { mutableStateOf(sizeText) }
+                        var lastTick by remember { mutableStateOf((sizeText * 10f).toInt()) }
+
+                        LaunchedEffect(sizeText) {
+                            sliderValue = sizeText
+                            lastTick = (sizeText * 10f).toInt()
+                        }
+
+                        LaunchedEffect(sliderInteractions) {
+                            sliderInteractions.interactions.collect { interaction ->
+                                when (interaction) {
+                                    is PressInteraction.Press -> {
+                                        if (!playedForGesture) {
+                                            sfx.play(Sfx.CLICK)
+                                            playedForGesture = true
+                                        }
+                                    }
+                                    is PressInteraction.Release,
+                                    is PressInteraction.Cancel -> {
+                                        playedForGesture = false
+                                    }
+                                    is DragInteraction.Start -> {
+                                        if (!playedForGesture) {
+                                            sfx.play(Sfx.CLICK)
+                                            playedForGesture = true
+                                        }
+                                    }
+                                    is DragInteraction.Stop,
+                                    is DragInteraction.Cancel -> {
+                                        playedForGesture = false
+                                    }
+                                }
+                            }
+                        }
+
                         Slider(
                             value = sliderValue,
-                            onValueChange = { sliderValue = it },
-                            valueRange = 0.8f..1.6f,
-                            steps = 7,
+                            onValueChange = { v ->
+                                // Quantize to 0.1f and clamp to the range
+                                val clamped = v.coerceIn(min, max)
+                                val tick = (clamped * 10f).roundToInt()          // 8..16
+                                    .coerceIn((min * 10f).toInt(), (max * 10f).toInt())
+
+                                // Play once per tick change (increase or decrease)
+                                if (tick != lastTick) {
+                                    sfx.play(Sfx.CLICK)
+                                    lastTick = tick
+                                }
+
+                                // Snap slider visually to the discrete tick
+                                sliderValue = tick / 10f
+                            },
+                            valueRange = min..max,
+                            steps = stepsCount,                                  // 7
                             onValueChangeFinished = { viewModel.setSizeText(sliderValue) }
                         )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            TextButton(onClick = { viewModel.setSizeText((sizeText - 0.1f).coerceIn(0.8f, 1.6f)) }) {
+                            TextButton(onClick = {
+                                sfx.play(Sfx.CLICK)
+                                viewModel.setSizeText((sizeText - 0.1f).coerceIn(0.8f, 1.6f))
+                            }) {
                                 Text("A-", color = GreenDark, fontWeight = FontWeight.Bold)
                             }
-                            TextButton(onClick = { viewModel.setSizeText(1.0f) }) {
+                            TextButton(onClick = {
+                                sfx.play(Sfx.CLICK)
+                                viewModel.setSizeText(1.0f)
+                            }) {
                                 Text("Padrão", color = GreenDark, fontWeight = FontWeight.Bold)
                             }
-                            TextButton(onClick = { viewModel.setSizeText((sizeText + 0.1f).coerceIn(0.8f, 1.6f)) }) {
+                            TextButton(onClick = {
+                                sfx.play(Sfx.CLICK)
+                                viewModel.setSizeText((sizeText + 0.1f).coerceIn(0.8f, 1.6f))
+                            }) {
                                 Text("A+", color = GreenDark, fontWeight = FontWeight.Bold)
                             }
                         }
@@ -198,7 +285,7 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            // Texto de pré-visualização
+            // Pré-visualização
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -229,29 +316,19 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(24.dp))
 
-            // Footer
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(
-                    onClick = { sfx.play(Sfx.CLICK); onBack() },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Voltar", color = textColor)
-                }
-                Button(
-                    onClick = {
-                        sfx.play(Sfx.CLICK)
-                        viewModel.setDarkMode(darkMode)
-                        viewModel.setContrastText(contrast)
-                        viewModel.setSizeText(sizeText)
-                        onApply(darkMode, contrast, sizeText)
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
-                ) {
-                    Text("Aplicar", color = Color.White)
-                }
+            Button(
+                onClick = {
+                    sfx.play(Sfx.CLICK)
+                    viewModel.setDarkMode(darkMode)
+                    viewModel.setContrastText(contrast)
+                    viewModel.setSizeText(sizeText)
+                    onApply(darkMode, contrast, sizeText)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
+            ) {
+                Text("Aplicar", color = Color.White)
             }
         }
     }

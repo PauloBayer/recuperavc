@@ -171,8 +171,9 @@ private fun AudioAnalysisContent(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.End,
+                .windowInsetsPadding(WindowInsets.statusBars) // evita notch/status bar
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically
         ) {
             BackButton(onBack)
