@@ -31,10 +31,20 @@ class PhraseManager(private val context: Context) {
 
         val selected = if (available.isEmpty()) {
             val all = (primary + secondary).distinctBy { it.id }
-            all.minByOrNull { preferences.getLong(keyFor(it.description), 0L) }
+            val oldest = all.minByOrNull { preferences.getLong(keyFor(it.description), 0L) }
                 ?: all.first()
+            val candidates = all.filter {
+                preferences.getLong(keyFor(it.description), 0L) ==
+                preferences.getLong(keyFor(oldest.description), 0L)
+            }
+            candidates.randomOrNull() ?: oldest
         } else {
-            available.firstOrNull { it.description != lastUsedPhrase } ?: available.first()
+            val filtered = available.filter { it.description != lastUsedPhrase }
+            if (filtered.isNotEmpty()) {
+                filtered.random()
+            } else {
+                available.random()
+            }
         }
 
         markPhraseAsUsed(selected.description)
