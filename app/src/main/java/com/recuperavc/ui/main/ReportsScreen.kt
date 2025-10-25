@@ -93,8 +93,17 @@ fun ReportsScreen(onBack: () -> Unit) {
         .map { it.sortedBy { r -> r.date } }
         .collectAsState(initial = emptyList())
 
-    val motionReports = remember(rawMotionReports, startDate, endDate) {
-        rawMotionReports.filter { it.date >= startDate && it.date <= endDate }
+    var motionHandFilter by remember { mutableStateOf<Boolean?>(null) }
+    var motionDominantFilter by remember { mutableStateOf<Boolean?>(null) }
+
+    val motionReports = remember(rawMotionReports, startDate, endDate, motionHandFilter, motionDominantFilter) {
+        rawMotionReports
+            .filter { it.date >= startDate && it.date <= endDate }
+            .filter { report ->
+                val handMatch = motionHandFilter?.let { it == report.withRightHand } ?: true
+                val dominantMatch = motionDominantFilter?.let { it == report.withMainHand } ?: true
+                handMatch && dominantMatch
+            }
     }
 
     val coherenceReports by db.coherenceReportDao()
@@ -201,7 +210,19 @@ fun ReportsScreen(onBack: () -> Unit) {
                         onSelectReport = { report, chartType -> selectedCoherenceReport = report to chartType },
                         onBarTapSound = { sfx.play(Sfx.CLICK) }
                     )
-                    ReportTab.Motion -> MotionReportSection(motionReports)
+                    ReportTab.Motion -> MotionReportSection(
+                        items = motionReports,
+                        handFilter = motionHandFilter,
+                        dominantFilter = motionDominantFilter,
+                        onHandFilterChange = {
+                            sfx.play(Sfx.CLICK)
+                            motionHandFilter = it
+                        },
+                        onDominantFilterChange = {
+                            sfx.play(Sfx.CLICK)
+                            motionDominantFilter = it
+                        }
+                    )
                 }
 
                 Spacer(Modifier.height(20.dp))
