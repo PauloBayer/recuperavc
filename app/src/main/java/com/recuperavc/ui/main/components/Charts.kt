@@ -84,46 +84,50 @@ fun BarChart(
     fun fmt(v: Float): String = if (maxY >= 10f) v.toInt().toString() else String.format("%.1f", v)
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
-            Column(
-                modifier = Modifier
-                    .width(56.dp)
-                    .fillMaxHeight(),
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier.width(56.dp).height(17.dp),
+                contentAlignment = Alignment.BottomStart
             ) {
                 if (yAxisLabel != null) {
                     Text(
                         yAxisLabel,
                         fontSize = 11.sp,
-                        color = Color.Black.copy(alpha = 0.7f),
-                        modifier = Modifier.padding(bottom = 6.dp)
+                        color = Color.Black.copy(alpha = 0.7f)
                     )
-                } else {
-                    Spacer(Modifier.height(6.dp))
                 }
-                BoxWithConstraints(
-                    modifier = Modifier.fillMaxHeight()
-                ) {
-                    val containerHeight = maxHeight
-                    tickValues.forEachIndexed { index, v ->
-                        val t = ticks[index]
-                        val yPosition = 1f - t
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .align(Alignment.TopEnd)
-                                .offset(y = with(LocalDensity.current) {
-                                    (yPosition * containerHeight.toPx()).toDp() - 6.dp
-                                }),
-                            contentAlignment = Alignment.CenterEnd
-                        ) {
-                            Text(
-                                fmt(v),
-                                fontSize = 10.sp,
-                                fontWeight = if (v == maxY || v == minY) FontWeight.Bold else FontWeight.SemiBold,
-                                color = if (v == maxY || v == minY) Color.Black else Color.Black.copy(alpha = 0.6f),
-                                modifier = Modifier.padding(end = 4.dp)
-                            )
-                        }
+            }
+            Spacer(Modifier.weight(1f))
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            BoxWithConstraints(
+                modifier = Modifier
+                    .width(56.dp)
+                    .fillMaxHeight()
+            ) {
+                val containerHeight = maxHeight
+                tickValues.forEachIndexed { index, v ->
+                    val t = ticks[index]
+                    val yPosition = 1f - t
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.TopEnd)
+                            .offset(y = with(LocalDensity.current) {
+                                (yPosition * containerHeight.toPx()).toDp() - 6.dp
+                            }),
+                        contentAlignment = Alignment.CenterEnd
+                    ) {
+                        Text(
+                            fmt(v),
+                            fontSize = 10.sp,
+                            fontWeight = if (v == maxY || v == minY) FontWeight.Bold else FontWeight.SemiBold,
+                            color = if (v == maxY || v == minY) Color.Black else Color.Black.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(end = 4.dp)
+                        )
                     }
                 }
             }
