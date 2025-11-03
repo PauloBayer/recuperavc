@@ -1,5 +1,6 @@
-package com.recuperavc.ui.main.coherence
+package com.recuperavc.ui.main.reports.coherence
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -15,26 +16,38 @@ import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.recuperavc.models.CoherenceReport
 import com.recuperavc.models.Phrase
-import com.recuperavc.ui.main.CoherenceChartType
-import com.recuperavc.ui.main.components.BarChart
-import com.recuperavc.ui.main.components.ChartCard
-import com.recuperavc.ui.theme.GreenDark
-import com.recuperavc.ui.theme.GreenLight
+import com.recuperavc.ui.main.reports.type.CoherenceChartType
+import com.recuperavc.ui.main.reports.components.BarChart
+import com.recuperavc.ui.main.reports.components.ChartCard
+import com.recuperavc.ui.theme.LocalReportsPalette
 import java.util.UUID
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.recuperavc.models.SettingsViewModel
+import com.recuperavc.ui.factory.SettingsViewModelFactory
+import com.recuperavc.ui.util.InitialSettings
+import com.recuperavc.ui.util.rememberInitialSettings
+import org.json.JSONObject
+
+/* helpers */
+private fun Color.luma(): Float = 0.299f * red + 0.587f * green + 0.114f * blue
+private val Color.on: Color get() = if (luma() > 0.6f) Color.Black else Color.White
 
 @Composable
 fun CoherenceReportSection(
@@ -42,6 +55,13 @@ fun CoherenceReportSection(
     onSelectReport: (CoherenceReport, CoherenceChartType) -> Unit,
     onBarTapSound: () -> Unit
 ) {
+    val p = LocalReportsPalette.current
+
+    val context = LocalContext.current
+    val settings: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context))
+    val initial: InitialSettings? = rememberInitialSettings(settings)
+    val appliedScale = settings.sizeTextFlow.collectAsState(initial = initial?.scale ?: 1f).value
+
     val pointsTime = items.map { it.averageTimePerTry }
     val pointsErrors = items.map { it.averageErrorsPerTry }
     val labels = items.map { r ->
@@ -53,25 +73,21 @@ fun CoherenceReportSection(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            colors = CardDefaults.cardColors(containerColor = p.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = if (p.borderSoft != null) 0.dp else 4.dp),
+            border = p.borderSoft?.let { BorderStroke(1.dp, it) }
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(
-                    Icons.Default.TrendingUp,
-                    contentDescription = null,
-                    tint = Color.Black.copy(alpha = 0.3f),
-                    modifier = Modifier.size(64.dp)
-                )
+                Icon(Icons.Default.TrendingUp, contentDescription = null, tint = p.textSecondary, modifier = Modifier.size(64.dp))
                 Spacer(Modifier.height(16.dp))
                 Text(
                     text = "Nenhum relatório encontrado",
-                    fontSize = 18.sp,
+                    fontSize = (18.sp * appliedScale),
                     fontWeight = FontWeight.Bold,
-                    color = Color.Black.copy(alpha = 0.6f),
+                    color = p.textSecondary,
                     textAlign = TextAlign.Center
                 )
             }
@@ -81,8 +97,8 @@ fun CoherenceReportSection(
 
     Text(
         text = "Toque nas barras para ver detalhes",
-        fontSize = 16.sp,
-        color = GreenDark,
+        fontSize = (16.sp * appliedScale),
+        color = p.accent,
         fontWeight = FontWeight.SemiBold,
         textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth()
@@ -118,7 +134,21 @@ fun CoherenceReportDetailDialog(
     onDismiss: () -> Unit,
     onAnyTap: () -> Unit
 ) {
+    val p = LocalReportsPalette.current
+
+    val context = LocalContext.current
+    val settings: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context))
+    val initial: InitialSettings? = rememberInitialSettings(settings)
+    val appliedScale = settings.sizeTextFlow.collectAsState(initial = initial?.scale ?: 1f).value
+    val appliedContrast = settings.contrastFlow.collectAsState(initial = initial?.contrast ?: false).value
+
     val groups = remember(report.allTestsDescription) { parseCoherenceReportGroups(report.allTestsDescription) }
+
+    // Colors that avoid green in High-Contrast
+    val okColor = if (appliedContrast) p.accent else Color(0xFF2E7D32)
+    val okBg = okColor.copy(alpha = if (appliedContrast) 0.25f else 0.15f)
+    val errColor = if (appliedContrast) Color(0xFFFF8A80) else Color(0xFFD32F2F)
+    val errBg = errColor.copy(alpha = 0.15f)
 
     Box(
         modifier = Modifier
@@ -132,8 +162,9 @@ fun CoherenceReportDetailDialog(
                 .padding(20.dp)
                 .align(Alignment.Center),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+            colors = CardDefaults.cardColors(containerColor = p.sheet),
+            elevation = CardDefaults.cardElevation(defaultElevation = if (p.borderSoft != null) 0.dp else 12.dp),
+            border = p.borderSoft?.let { BorderStroke(1.dp, it) }
         ) {
             Column(
                 modifier = Modifier
@@ -148,26 +179,16 @@ fun CoherenceReportDetailDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text(
-                            "Teste de Raciocínio",
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 24.sp,
-                            color = GreenDark
-                        )
+                        Text("Teste de Raciocínio", fontWeight = FontWeight.ExtraBold, fontSize = (24.sp * appliedScale), color = p.accent)
                         val local = LocalDateTime.ofInstant(report.date, ZoneId.systemDefault())
                         Text(
                             DateTimeFormatter.ofPattern("dd/MM/yyyy 'às' HH:mm").format(local),
-                            fontSize = 14.sp,
+                            fontSize = (14.sp * appliedScale),
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.Black.copy(alpha = 0.6f)
+                            color = p.textSecondary
                         )
                     }
-                    Icon(
-                        Icons.Default.TrendingUp,
-                        contentDescription = null,
-                        tint = GreenDark,
-                        modifier = Modifier.size(32.dp)
-                    )
+                    Icon(Icons.Default.TrendingUp, contentDescription = null, tint = p.accent, modifier = Modifier.size(32.dp))
                 }
 
                 Spacer(Modifier.height(20.dp))
@@ -176,78 +197,39 @@ fun CoherenceReportDetailDialog(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = GreenLight.copy(alpha = 0.15f))
+                    colors = CardDefaults.cardColors(containerColor = p.surfaceVariant),
+                    border = p.borderSoft?.let { BorderStroke(1.dp, it) }
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            "Resumo do Teste",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            color = GreenDark
-                        )
+                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                        Text("Resumo do Teste", fontWeight = FontWeight.Bold, fontSize = (16.sp * appliedScale), color = p.textPrimary)
                         Spacer(Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            StatsBox(
-                                modifier = Modifier.weight(1f),
-                                label = "Frases",
-                                value = "${groups.size}",
-                                icon = Icons.Default.Description
-                            )
-                            StatsBox(
-                                modifier = Modifier.weight(1f),
-                                label = "Taxa de Acerto",
-                                value = "${String.format("%.0f", sr * 100)}%",
-                                icon = Icons.Default.CheckCircle
-                            )
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StatsBox(modifier = Modifier.weight(1f), label = "Frases", value = "${groups.size}", icon = Icons.Default.Description)
+                            StatsBox(modifier = Modifier.weight(1f), label = "Taxa de Acerto", value = "${String.format("%.0f", sr * 100)}%", icon = Icons.Default.CheckCircle)
                         }
                         Spacer(Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            StatsBox(
-                                modifier = Modifier.weight(1f),
-                                label = "Tempo Médio",
-                                value = "${String.format("%.1f", report.averageTimePerTry)}s",
-                                icon = Icons.Default.Timer
-                            )
-                            StatsBox(
-                                modifier = Modifier.weight(1f),
-                                label = "Tentativas Médias",
-                                value = String.format("%.1f", report.averageErrorsPerTry),
-                                icon = Icons.Default.RepeatOne
-                            )
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StatsBox(modifier = Modifier.weight(1f), label = "Tempo Médio", value = "${String.format("%.1f", report.averageTimePerTry)}s", icon = Icons.Default.Timer)
+                            StatsBox(modifier = Modifier.weight(1f), label = "Tentativas Médias", value = String.format("%.1f", report.averageErrorsPerTry), icon = Icons.Default.RepeatOne)
                         }
                     }
                 }
 
                 Spacer(Modifier.height(20.dp))
 
-                Text(
-                    "Detalhes por Frase",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = Color.Black
-                )
+                Text("Detalhes por Frase", fontWeight = FontWeight.Bold, fontSize = (18.sp * appliedScale), color = p.textPrimary)
                 Spacer(Modifier.height(12.dp))
 
                 groups.forEachIndexed { idx, g ->
                     val phrase = g.phraseId?.let { phraseMap[it]?.description } ?: ""
-                    val ok = g.success
-                    val statusColor = if (ok) Color(0xFF2E7D32) else Color(0xFFD32F2F)
+                    val success = g.success
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        colors = CardDefaults.cardColors(containerColor = p.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = if (p.borderSoft != null) 0.dp else 2.dp),
+                        border = p.borderSoft?.let { BorderStroke(1.dp, it) }
                     ) {
                         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                             Row(
@@ -255,23 +237,13 @@ fun CoherenceReportDetailDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = "Frase ${idx + 1}",
-                                    fontWeight = FontWeight.ExtraBold,
-                                    fontSize = 18.sp,
-                                    color = Color.Black
-                                )
-                                Card(
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = statusColor.copy(alpha = 0.15f)
-                                    )
-                                ) {
+                                Text("Frase ${idx + 1}", fontWeight = FontWeight.ExtraBold, fontSize = (18.sp * appliedScale), color = p.textPrimary)
+                                Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = if (success) okBg else errBg)) {
                                     Text(
-                                        text = if (ok) "✓ Acertou" else "✗ Errou",
-                                        fontSize = 14.sp,
+                                        text = if (success) "✓ Acertou" else "✗ Errou",
+                                        fontSize = (14.sp * appliedScale),
                                         fontWeight = FontWeight.Bold,
-                                        color = statusColor,
+                                        color = if (success) okColor else errColor,
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                                     )
                                 }
@@ -282,88 +254,45 @@ fun CoherenceReportDetailDialog(
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
+                                    colors = CardDefaults.cardColors(containerColor = p.surfaceVariant),
+                                    border = p.borderSoft?.let { BorderStroke(1.dp, it) }
                                 ) {
                                     Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-                                        Text(
-                                            "Frase Correta:",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.Black.copy(alpha = 0.5f)
-                                        )
+                                        Text("Frase Correta:", fontSize = (11.sp * appliedScale), fontWeight = FontWeight.Bold, color = p.textSecondary)
                                         Spacer(Modifier.height(4.dp))
-                                        Text(
-                                            phrase,
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color.Black
-                                        )
+                                        Text(phrase, fontSize = (15.sp * appliedScale), fontWeight = FontWeight.SemiBold, color = p.textPrimary)
                                     }
                                 }
                             }
 
                             Spacer(Modifier.height(12.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                InfoCard(
-                                    modifier = Modifier.weight(1f),
-                                    label = "Tentativas",
-                                    value = "${g.triesCount}"
-                                )
-                                InfoCard(
-                                    modifier = Modifier.weight(1f),
-                                    label = "Tempo",
-                                    value = "${String.format("%.1f", g.timeUntilCorrectMs / 1000f)}s"
-                                )
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                InfoCard(modifier = Modifier.weight(1f), label = "Tentativas", value = "${g.triesCount}")
+                                InfoCard(modifier = Modifier.weight(1f), label = "Tempo", value = "${String.format("%.1f", g.timeUntilCorrectMs / 1000f)}s")
                             }
 
                             if (g.tries.isNotEmpty()) {
                                 Spacer(Modifier.height(12.dp))
-                                Text(
-                                    "Histórico de Tentativas:",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.Black.copy(alpha = 0.7f)
-                                )
+                                Text("Histórico de Tentativas:", fontSize = (12.sp * appliedScale), fontWeight = FontWeight.Bold, color = p.textSecondary)
                                 Spacer(Modifier.height(8.dp))
 
                                 g.tries.forEachIndexed { tIdx, t ->
-                                    val tColor = if (t.correct) Color(0xFF2E7D32) else Color(0xFFD32F2F)
+                                    val tCol = if (t.correct) okColor else errColor
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(8.dp))
-                                            .background(tColor.copy(alpha = 0.08f))
+                                            .background(tCol.copy(alpha = if (appliedContrast) 0.18f else 0.08f))
                                             .padding(10.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Row(
-                                            modifier = Modifier.weight(1f),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                "${tIdx + 1}.",
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                color = tColor
-                                            )
+                                        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                            Text("${tIdx + 1}.", fontSize = (13.sp * appliedScale), fontWeight = FontWeight.ExtraBold, color = tCol)
                                             Spacer(Modifier.width(8.dp))
-                                            Text(
-                                                t.typed,
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = Color.Black
-                                            )
+                                            Text(t.typed, fontSize = (14.sp * appliedScale), fontWeight = FontWeight.SemiBold, color = p.textPrimary)
                                         }
-                                        Text(
-                                            "${String.format("%.1f", t.elapsedMs / 1000f)}s",
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = tColor
-                                        )
+                                        Text("${String.format("%.1f", t.elapsedMs / 1000f)}s", fontSize = (13.sp * appliedScale), fontWeight = FontWeight.Bold, color = tCol)
                                     }
                                     if (tIdx < g.tries.lastIndex) Spacer(Modifier.height(6.dp))
                                 }
@@ -375,15 +304,12 @@ fun CoherenceReportDetailDialog(
 
                 Spacer(Modifier.height(20.dp))
                 Button(
-                    onClick = {
-                        onAnyTap()
-                        onDismiss()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = GreenDark),
+                    onClick = { onAnyTap(); onDismiss() },
+                    colors = ButtonDefaults.buttonColors(containerColor = p.accent, contentColor = p.accent.on),
                     modifier = Modifier.fillMaxWidth().height(54.dp),
                     shape = RoundedCornerShape(16.dp)
                 ) {
-                    Text("Fechar", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                    Text("Fechar", color = p.accent.on, fontSize = (17.sp * appliedScale), fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -395,40 +321,26 @@ private fun StatsBox(
     modifier: Modifier = Modifier,
     label: String,
     value: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector
+    icon: ImageVector
 ) {
+    val p = LocalReportsPalette.current
+    val context = LocalContext.current
+    val settings: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context))
+    val initial: InitialSettings? = rememberInitialSettings(settings)
+    val appliedScale = settings.sizeTextFlow.collectAsState(initial = initial?.scale ?: 1f).value
+
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        colors = CardDefaults.cardColors(containerColor = p.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (p.borderSoft != null) 0.dp else 1.dp),
+        border = p.borderSoft?.let { BorderStroke(1.dp, it) }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = GreenDark,
-                modifier = Modifier.size(28.dp)
-            )
+        Column(modifier = Modifier.fillMaxWidth().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icon, contentDescription = null, tint = p.accent, modifier = Modifier.size(28.dp))
             Spacer(Modifier.height(4.dp))
-            Text(
-                value,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 20.sp,
-                color = GreenDark
-            )
-            Text(
-                label,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.Black.copy(alpha = 0.6f),
-                textAlign = TextAlign.Center
-            )
+            Text(value, fontWeight = FontWeight.ExtraBold, fontSize = (20.sp * appliedScale), color = p.textPrimary)
+            Text(label, fontSize = (11.sp * appliedScale), fontWeight = FontWeight.SemiBold, color = p.textSecondary, textAlign = TextAlign.Center)
         }
     }
 }
@@ -439,33 +351,27 @@ private fun InfoCard(
     label: String,
     value: String
 ) {
+    val p = LocalReportsPalette.current
+    val context = LocalContext.current
+    val settings: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context))
+    val initial: InitialSettings? = rememberInitialSettings(settings)
+    val appliedScale = settings.sizeTextFlow.collectAsState(initial = initial?.scale ?: 1f).value
+
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
+        colors = CardDefaults.cardColors(containerColor = p.surfaceVariant),
+        border = p.borderSoft?.let { BorderStroke(1.dp, it) }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                label,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black.copy(alpha = 0.6f)
-            )
+        Column(modifier = Modifier.fillMaxWidth().padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(label, fontSize = (11.sp * appliedScale), fontWeight = FontWeight.Bold, color = p.textSecondary)
             Spacer(Modifier.height(4.dp))
-            Text(
-                value,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 16.sp,
-                color = GreenDark
-            )
+            Text(value, fontWeight = FontWeight.ExtraBold, fontSize = (16.sp * appliedScale), color = p.textPrimary)
         }
     }
 }
+
+/* parsing stays unchanged below */
 
 data class CoherencePhraseGroup(
     val phraseId: UUID?,
@@ -483,7 +389,7 @@ data class CoherencePhraseTry(
 
 fun parseCoherenceReportGroups(desc: String): List<CoherencePhraseGroup> {
     return try {
-        val root = org.json.JSONObject(desc)
+        val root = JSONObject(desc)
         val arr = root.optJSONArray("attempts") ?: return emptyList()
         buildList {
             for (i in 0 until arr.length()) {
