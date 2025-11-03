@@ -61,7 +61,13 @@ fun MotionTestScreen(
     onBack: () -> Unit = {}
 ) {
     val sfx = rememberSfxController()
-    BackHandler(enabled = true) { sfx.play(Sfx.CLICK); onBack() }
+
+    var showEndDialog by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = true) {
+        sfx.play(Sfx.CLICK)
+        showEndDialog = true
+    }
 
     val context = LocalContext.current
     val settings: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context))
@@ -123,6 +129,73 @@ fun MotionTestScreen(
 
     fun durationFor(mode: MotionMode?) =
         if (mode == MotionMode.STATIC) durationSecondsWithoutMovement else durationSecondsWithMovement
+
+    if (showEndDialog) {
+        val container = when {
+            appliedContrast -> Color.Black
+            appliedDark -> Color(0xFF1E1E1E)
+            else -> Color.White
+        }
+        val titleColor = if (appliedContrast) accentSolid else if (appliedDark) Color.White else Color(0xFF1B1B1B)
+        val bodyColor = if (appliedContrast || appliedDark) Color.White else Color(0xFF3A3A3A)
+        val confirmContainer = when {
+            appliedContrast -> accentSolid
+            appliedDark -> GreenDark
+            else -> Color.White
+        }
+        val confirmContent = when {
+            appliedContrast -> Color.Black
+            appliedDark -> Color.White
+            else -> Color(0xFF2E7D32)
+        }
+        val dismissContent = when {
+            appliedContrast -> accentSolid
+            appliedDark -> Color(0xFF8BC34A)
+            else -> GreenDark
+        }
+
+        AlertDialog(
+            onDismissRequest = { sfx.play(Sfx.BUBBLE); showEndDialog = false },
+            containerColor = container,
+            titleContentColor = titleColor,
+            textContentColor = bodyColor,
+            confirmButton = {
+                Button(
+                    onClick = {
+                        sfx.play(Sfx.CLICK)
+                        showEndDialog = false
+                        onBack()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = confirmContainer,
+                        contentColor = confirmContent
+                    ),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text("Sair", fontSize = 16.sp * appliedScale)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { sfx.play(Sfx.CLICK); showEndDialog = false },
+                    colors = ButtonDefaults.textButtonColors(contentColor = dismissContent)
+                ) { Text("Continuar", fontSize = 16.sp * appliedScale) }
+            },
+            title = {
+                Text("Encerrar sessão", fontWeight = FontWeight.SemiBold, fontSize = 20.sp * appliedScale)
+            },
+            text = {
+                val message = if (testStarted && !finished) {
+                    "O teste está em andamento. Se sair agora, o progresso será perdido."
+                } else if (finished) {
+                    "Deseja voltar para a tela inicial?"
+                } else {
+                    "Deseja cancelar e voltar para a tela inicial?"
+                }
+                Text(message, fontSize = 15.sp * appliedScale, lineHeight = 20.sp * appliedScale)
+            }
+        )
+    }
 
     @Suppress("UnusedBoxWithConstraintsScope")
     BoxWithConstraints(
@@ -214,7 +287,7 @@ fun MotionTestScreen(
                 horizontalArrangement = Arrangement.Start,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { sfx.play(Sfx.CLICK); onBack() }) {
+                IconButton(onClick = { sfx.play(Sfx.CLICK); showEndDialog = true }) {
                     Icon(
                         imageVector = Icons.Filled.ArrowBack,
                         contentDescription = "Voltar",
@@ -481,7 +554,7 @@ fun MotionTestScreen(
                         ) { Text("Novo teste", color = buttonFgOnAccent, fontSize = (16.sp * appliedScale), fontWeight = FontWeight.SemiBold) }
 
                         Button(
-                            onClick = { sfx.play(Sfx.CLICK); onBack() },
+                            onClick = { sfx.play(Sfx.CLICK); showEndDialog = true },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = accentSolid,
                                 contentColor = buttonFgOnAccent
