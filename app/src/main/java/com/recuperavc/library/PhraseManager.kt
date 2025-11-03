@@ -18,47 +18,70 @@ class PhraseManager(private val context: Context) {
 
     private var lastUsedPhrase: String? = null
 
-    suspend fun getNextPhrase(type: PhraseType = PhraseType.MEDIUM): Phrase = mutex.withLock {
+    /**
+     * If [requestedType] is provided, pick strictly from that type.
+     * If null, use the rotating sequence SHORT -> MEDIUM -> BIG.
+     */
+    suspend fun getNextPhrase(requestedType: PhraseType? = null): Phrase = mutex.withLock {
         val dao = DbProvider.db(context).phraseDao()
-        var currentType = getCurrentPhraseType()
 
-        var selected: Phrase? = null
+        var currentType: PhraseType = requestedType ?: getCurrentPhraseType()
         var finalType = currentType
 
-        for (attempt in 0..2) {
-            val allOfType = dao.getByType(currentType)
-            val available = allOfType.filter { isPhraseOutOfCooldown(it.description) }
-
-            if (available.isNotEmpty()) {
-                val filtered = available.filter { it.description != lastUsedPhrase }
-                selected = if (filtered.isNotEmpty()) {
-                    filtered.random()
-                } else {
-                    available.random()
-                }
-                finalType = currentType
-                break
+        // No labelled returns here; just use if/else
+        val pickFromType: suspend (PhraseType) -> Phrase? = { type ->
+            val allOfType = dao.getByType(type)
+            if (allOfType.isEmpty()) {
+                null
             } else {
+                val available = allOfType.filter { isPhraseOutOfCooldown(it.description) }
+                val pool = if (available.isNotEmpty()) {
+                    val filtered = available.filter { it.description != lastUsedPhrase }
+                    if (filtered.isNotEmpty()) filtered else available
+                } else {
+                    emptyList()
+                }
+
+                if (pool.isNotEmpty()) {
+                    pool.random()
+                } else {
+                    val oldest = allOfType.minByOrNull { preferences.getLong(keyFor(it.description), 0L) }
+                        ?: allOfType.first()
+                    val oldestStamp = preferences.getLong(keyFor(oldest.description), 0L)
+                    val candidates = allOfType.filter {
+                        preferences.getLong(keyFor(it.description), 0L) == oldestStamp
+                    }
+                    candidates.randomOrNull() ?: oldest
+                }
+            }
+        }
+
+        val selected: Phrase? = if (requestedType != null) {
+            // Strictly from requested type
+            pickFromType(requestedType)
+        } else {
+            // Rotate as before
+            var chosen: Phrase? = null
+            repeat(3) {
+                chosen = pickFromType(currentType)
+                if (chosen != null) {
+                    finalType = currentType
+                    return@repeat
+                }
                 currentType = getNextTypeInSequence(currentType)
             }
+            chosen
         }
 
-        if (selected == null) {
-            val allOfType = dao.getByType(currentType)
-            val oldest = allOfType.minByOrNull { preferences.getLong(keyFor(it.description), 0L) }
-                ?: allOfType.first()
-            val candidates = allOfType.filter {
-                preferences.getLong(keyFor(it.description), 0L) ==
-                preferences.getLong(keyFor(oldest.description), 0L)
-            }
-            selected = candidates.randomOrNull() ?: oldest
-            finalType = currentType
+        val result = selected ?: run {
+            val allOfType = dao.getByType(finalType)
+            allOfType.randomOrNull() ?: dao.getAll().first()
         }
 
-        markPhraseAsUsed(selected.description)
-        saveCurrentPhraseType(finalType)
-        lastUsedPhrase = selected.description
-        return@withLock selected
+        markPhraseAsUsed(result.description)
+        if (requestedType == null) saveCurrentPhraseType(finalType)
+        lastUsedPhrase = result.description
+        return@withLock result
     }
 
     private fun getCurrentPhraseType(): PhraseType {
@@ -66,13 +89,12 @@ class PhraseManager(private val context: Context) {
         return PhraseType.values().getOrNull(typeOrdinal) ?: PhraseType.SHORT
     }
 
-    private fun getNextTypeInSequence(current: PhraseType): PhraseType {
-        return when (current) {
+    private fun getNextTypeInSequence(current: PhraseType): PhraseType =
+        when (current) {
             PhraseType.SHORT -> PhraseType.MEDIUM
             PhraseType.MEDIUM -> PhraseType.BIG
             PhraseType.BIG -> PhraseType.SHORT
         }
-    }
 
     private fun saveCurrentPhraseType(type: PhraseType) {
         preferences.edit().putInt("current_phrase_type", type.ordinal).commit()

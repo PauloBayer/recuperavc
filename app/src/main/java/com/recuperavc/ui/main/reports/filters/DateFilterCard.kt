@@ -1,7 +1,9 @@
-package com.recuperavc.ui.main.filters
+package com.recuperavc.ui.main.reports.filters
 
 import android.app.DatePickerDialog
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -17,7 +20,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.recuperavc.ui.theme.GreenDark
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.recuperavc.models.SettingsViewModel
+import com.recuperavc.ui.factory.SettingsViewModelFactory
+import com.recuperavc.ui.theme.LocalReportsPalette
+import com.recuperavc.ui.util.InitialSettings
+import com.recuperavc.ui.util.rememberInitialSettings
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -33,49 +41,70 @@ fun DateFilterCard(
     onEndDateChange: (Instant) -> Unit,
     onTapSound: () -> Unit
 ) {
+    val p = LocalReportsPalette.current
     val context = LocalContext.current
+
+    // Read scale only (palette already comes from ReportsScreen provider)
+    val settings: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context))
+    val initial: InitialSettings? = rememberInitialSettings(settings)
+    val appliedScale = settings.sizeTextFlow.collectAsState(initial = initial?.scale ?: 1f).value
+
+    val cardShape = RoundedCornerShape(16.dp)
+    val tileShape = RoundedCornerShape(8.dp)
+
+    val border = p.borderSoft?.let { BorderStroke(1.dp, it) }
+    val tileBorderColor = p.borderSoft ?: Color.Transparent
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        shape = cardShape,
+        colors = CardDefaults.cardColors(containerColor = p.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (border != null) 0.dp else 4.dp),
+        border = border
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Text(
                 text = "Filtro de Data",
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = Color.Black
+                fontSize = (18.sp * appliedScale),
+                color = p.textPrimary
             )
             Spacer(Modifier.height(8.dp))
             if (!isManuallySet) {
                 Text(
                     text = "Mostrando dados dos últimos 7 dias",
-                    fontSize = 14.sp,
-                    color = Color.Black.copy(alpha = 0.7f)
+                    fontSize = (14.sp * appliedScale),
+                    color = p.textSecondary
                 )
                 Spacer(Modifier.height(12.dp))
             } else {
                 Spacer(Modifier.height(4.dp))
             }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // Início
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Início", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
+                    Text(
+                        "Início",
+                        fontSize = (14.sp * appliedScale),
+                        fontWeight = FontWeight.SemiBold,
+                        color = p.textPrimary
+                    )
                     Spacer(Modifier.height(4.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFFF5F5F5))
+                            .clip(tileShape)
+                            .background(p.surfaceVariant)
+                            .border(width = 1.dp, color = tileBorderColor, shape = tileShape)
                             .clickable {
                                 onTapSound()
                                 val cal = Calendar.getInstance()
-                                val localDateTime = LocalDateTime.ofInstant(startDate, ZoneId.systemDefault())
-                                cal.set(localDateTime.year, localDateTime.monthValue - 1, localDateTime.dayOfMonth)
+                                val ldt = LocalDateTime.ofInstant(startDate, ZoneId.systemDefault())
+                                cal.set(ldt.year, ldt.monthValue - 1, ldt.dayOfMonth)
 
                                 DatePickerDialog(
                                     context,
@@ -96,31 +125,39 @@ fun DateFilterCard(
                             text = DateTimeFormatter.ofPattern("dd/MM/yyyy").format(
                                 LocalDateTime.ofInstant(startDate, ZoneId.systemDefault())
                             ),
-                            fontSize = 16.sp,
+                            fontSize = (16.sp * appliedScale),
                             fontWeight = FontWeight.Bold,
-                            color = GreenDark
+                            color = p.accent
                         )
                         Icon(
                             Icons.Default.CalendarToday,
                             contentDescription = null,
-                            tint = GreenDark,
+                            tint = p.accent,
                             modifier = Modifier.size(20.dp)
                         )
                     }
                 }
+
+                // Fim
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Fim", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.Black)
+                    Text(
+                        "Fim",
+                        fontSize = (14.sp * appliedScale),
+                        fontWeight = FontWeight.SemiBold,
+                        color = p.textPrimary
+                    )
                     Spacer(Modifier.height(4.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFFF5F5F5))
+                            .clip(tileShape)
+                            .background(p.surfaceVariant)
+                            .border(width = 1.dp, color = tileBorderColor, shape = tileShape)
                             .clickable {
                                 onTapSound()
                                 val cal = Calendar.getInstance()
-                                val localDateTime = LocalDateTime.ofInstant(endDate, ZoneId.systemDefault())
-                                cal.set(localDateTime.year, localDateTime.monthValue - 1, localDateTime.dayOfMonth)
+                                val ldt = LocalDateTime.ofInstant(endDate, ZoneId.systemDefault())
+                                cal.set(ldt.year, ldt.monthValue - 1, ldt.dayOfMonth)
 
                                 DatePickerDialog(
                                     context,
@@ -141,14 +178,14 @@ fun DateFilterCard(
                             text = DateTimeFormatter.ofPattern("dd/MM/yyyy").format(
                                 LocalDateTime.ofInstant(endDate, ZoneId.systemDefault())
                             ),
-                            fontSize = 16.sp,
+                            fontSize = (16.sp * appliedScale),
                             fontWeight = FontWeight.Bold,
-                            color = GreenDark
+                            color = p.accent
                         )
                         Icon(
                             Icons.Default.CalendarToday,
                             contentDescription = null,
-                            tint = GreenDark,
+                            tint = p.accent,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -157,4 +194,3 @@ fun DateFilterCard(
         }
     }
 }
-

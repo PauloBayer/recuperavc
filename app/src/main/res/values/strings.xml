@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">RecuperaVC</string>
+    <string name="app_name">RecuperAVC</string>
     <string name="phrase_to_read">O rato roeu a roupa do rei de Roma</string>
     <string name="start_recording">Começar a gravação</string>
     <string name="stop_recording">Parar gravação</string>

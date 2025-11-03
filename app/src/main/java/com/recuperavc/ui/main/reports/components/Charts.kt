@@ -1,36 +1,42 @@
-package com.recuperavc.ui.main.components
+package com.recuperavc.ui.main.reports.components
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalDensity
-import com.recuperavc.ui.theme.GreenDark
-import com.recuperavc.ui.theme.GreenLight
+import com.recuperavc.ui.theme.LocalReportsPalette
+
+/* ------------------------------- Chart Card ------------------------------ */
 
 @Composable
 fun ChartCard(title: String, subtitle: String, content: @Composable () -> Unit) {
+    val p = LocalReportsPalette.current
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        colors = CardDefaults.cardColors(containerColor = p.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (p.borderSoft != null) 0.dp else 4.dp),
+        border = p.borderSoft?.let { BorderStroke(1.dp, it) }
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Row(
@@ -39,26 +45,18 @@ fun ChartCard(title: String, subtitle: String, content: @Composable () -> Unit) 
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text(
-                        text = title,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = Color.Black
-                    )
-                    Text(
-                        text = subtitle,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.Black.copy(alpha = 0.7f)
-                    )
+                    Text(title, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = p.textPrimary)
+                    Text(subtitle, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = p.textSecondary)
                 }
-                Icon(Icons.Default.TrendingUp, contentDescription = null, tint = GreenDark, modifier = Modifier.size(28.dp))
+                Icon(Icons.Default.TrendingUp, contentDescription = null, tint = p.accent, modifier = Modifier.size(28.dp))
             }
             Spacer(Modifier.height(12.dp))
-            Box(modifier = Modifier.fillMaxWidth().height(200.dp)) { content() }
+            Box(modifier = Modifier.fillMaxWidth()) { content() }
         }
     }
 }
+
+/* -------------------------------- BarChart ------------------------------- */
 
 @Composable
 fun BarChart(
@@ -68,14 +66,19 @@ fun BarChart(
     onBarClick: ((Int) -> Unit)?,
     onBarTapSound: (() -> Unit)? = null
 ) {
-    if (points.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Sem dados", color = Color.Black.copy(alpha = 0.6f))
+    val p = LocalReportsPalette.current
+
+    // sanitize values
+    val cleanPoints = remember(points) { points.map { v -> if (v.isNaN() || v.isInfinite() || v < 0f) 0f else v } }
+
+    if (cleanPoints.isEmpty()) {
+        Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
+            Text("Sem dados", color = p.textSecondary, fontSize = 14.sp)
         }
         return
     }
 
-    val maxY = (points.maxOrNull() ?: 1f).coerceAtLeast(1f)
+    val maxY = (cleanPoints.maxOrNull() ?: 0f).let { if (it == 0f) 1f else it }
     val minY = 0f
     val scrollState = rememberScrollState()
     val barWidthDp = 64
@@ -83,18 +86,14 @@ fun BarChart(
     val tickValues = ticks.map { minY + (maxY - minY) * it }
     fun fmt(v: Float): String = if (maxY >= 10f) v.toInt().toString() else String.format("%.1f", v)
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    val plotHeight = 150.dp
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // y-axis label
         Row(modifier = Modifier.fillMaxWidth()) {
-            Box(
-                modifier = Modifier.width(56.dp).height(17.dp),
-                contentAlignment = Alignment.BottomStart
-            ) {
+            Box(modifier = Modifier.width(56.dp).height(17.dp), contentAlignment = Alignment.BottomStart) {
                 if (yAxisLabel != null) {
-                    Text(
-                        yAxisLabel,
-                        fontSize = 11.sp,
-                        color = Color.Black.copy(alpha = 0.7f)
-                    )
+                    Text(yAxisLabel, fontSize = 11.sp, color = p.textSecondary)
                 }
             }
             Spacer(Modifier.weight(1f))
@@ -102,12 +101,9 @@ fun BarChart(
 
         Spacer(Modifier.height(6.dp))
 
-        Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
-            BoxWithConstraints(
-                modifier = Modifier
-                    .width(56.dp)
-                    .fillMaxHeight()
-            ) {
+        Row(modifier = Modifier.fillMaxWidth().height(plotHeight)) {
+            // Y ticks
+            BoxWithConstraints(modifier = Modifier.width(56.dp).fillMaxHeight()) {
                 val containerHeight = maxHeight
                 tickValues.forEachIndexed { index, v ->
                     val t = ticks[index]
@@ -116,34 +112,30 @@ fun BarChart(
                         modifier = Modifier
                             .fillMaxWidth()
                             .align(Alignment.TopEnd)
-                            .offset(y = with(LocalDensity.current) {
-                                (yPosition * containerHeight.toPx()).toDp() - 6.dp
-                            }),
+                            .offset(y = with(LocalDensity.current) { (yPosition * containerHeight.toPx()).toDp() - 6.dp }),
                         contentAlignment = Alignment.CenterEnd
                     ) {
                         Text(
                             fmt(v),
                             fontSize = 10.sp,
                             fontWeight = if (v == maxY || v == minY) FontWeight.Bold else FontWeight.SemiBold,
-                            color = if (v == maxY || v == minY) Color.Black else Color.Black.copy(alpha = 0.6f),
+                            color = if (v == maxY || v == minY) p.textPrimary else p.textSecondary,
                             modifier = Modifier.padding(end = 4.dp)
                         )
                     }
                 }
             }
 
+            // canvas + bars
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
                     .horizontalScroll(scrollState)
             ) {
-                val totalWidth = (points.size * barWidthDp).dp
-                Box(
-                    modifier = Modifier
-                        .width(totalWidth)
-                        .fillMaxHeight()
-                ) {
+                val totalWidth = (cleanPoints.size * barWidthDp).dp
+                Box(modifier = Modifier.width(totalWidth).fillMaxHeight()) {
+                    // grid
                     Canvas(modifier = Modifier.matchParentSize()) {
                         val h = size.height
                         val w = size.width
@@ -151,20 +143,24 @@ fun BarChart(
                             val t = ticks[i]
                             val y = (1f - t) * h
                             drawLine(
-                                color = Color(0xFFE0E0E0),
+                                color = p.gridLine,
                                 start = Offset(0f, y),
                                 end = Offset(w, y),
                                 strokeWidth = 1f
                             )
                         }
                     }
+                    // bars
                     Row(
-                        modifier = Modifier
-                            .matchParentSize(),
+                        modifier = Modifier.matchParentSize(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        points.forEachIndexed { idx, value ->
-                            val ratio = if (maxY == minY) 0f else ((value - minY) / (maxY - minY)).coerceIn(0f, 1f)
+                        cleanPoints.forEachIndexed { idx, value ->
+                            val raw = if (maxY == minY) 0f else ((value - minY) / (maxY - minY))
+                            val ratio = raw.coerceIn(0f, 1f)
+                            val minVisibleRatio = 0.02f
+                            val visibleRatio = if (value > 0f) ratio.coerceAtLeast(minVisibleRatio) else 0f
+
                             Box(
                                 modifier = Modifier
                                     .width(barWidthDp.dp)
@@ -179,9 +175,9 @@ fun BarChart(
                                 Box(
                                     modifier = Modifier
                                         .width(28.dp)
-                                        .fillMaxHeight(ratio)
+                                        .fillMaxHeight(visibleRatio)
                                         .clip(RoundedCornerShape(8.dp))
-                                        .background(GreenDark)
+                                        .background(p.chartBar)
                                 )
                             }
                         }
@@ -192,29 +188,21 @@ fun BarChart(
 
         Spacer(Modifier.height(8.dp))
 
+        // x-axis labels
         Row(modifier = Modifier.fillMaxWidth()) {
             Spacer(Modifier.width(56.dp))
             Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .horizontalScroll(scrollState)
-                    .padding(vertical = 4.dp)
+                modifier = Modifier.weight(1f).horizontalScroll(scrollState).padding(vertical = 4.dp)
             ) {
                 val totalWidth = (labels.size * barWidthDp).dp
-                Row(
-                    modifier = Modifier.width(totalWidth),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
+                Row(modifier = Modifier.width(totalWidth), horizontalArrangement = Arrangement.SpaceEvenly) {
                     labels.forEach { label ->
-                        Box(
-                            modifier = Modifier.width(barWidthDp.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
+                        Box(modifier = Modifier.width(barWidthDp.dp), contentAlignment = Alignment.Center) {
                             Text(
                                 text = label,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = Color.Black,
+                                color = p.textPrimary,
                                 textAlign = TextAlign.Center
                             )
                         }
@@ -225,14 +213,17 @@ fun BarChart(
     }
 }
 
+/* ------------------------------- SimpleChip ------------------------------ */
+
 @Composable
 fun SimpleChip(text: String) {
+    val p = LocalReportsPalette.current
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(GreenLight.copy(alpha = 0.25f))
+            .background(p.chipBg)
             .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
-        Text(text, color = GreenDark, fontSize = 12.sp)
+        Text(text, color = p.chipText, fontSize = 12.sp)
     }
 }

@@ -1,4 +1,4 @@
-package com.recuperavc.ui.main
+package com.recuperavc.ui.main.reports.type
 
 enum class ChartType { WPM, WER }
 enum class CoherenceChartType { TIME, ERRORS }

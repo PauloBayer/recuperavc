@@ -2,63 +2,47 @@ package com.recuperavc.ui.home
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Divider
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Gesture
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Summarize
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DrawerState
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.NavigationDrawerItemDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberDrawerState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.recuperavc.R
-import com.recuperavc.ui.theme.GreenDark
-import com.recuperavc.ui.theme.GreenLight
-import com.recuperavc.ui.theme.OnBackground
+import com.recuperavc.models.SettingsViewModel
+import com.recuperavc.ui.components.RecuperAVCBrandHeader
+import com.recuperavc.ui.factory.SettingsViewModelFactory
 import com.recuperavc.ui.sfx.Sfx
 import com.recuperavc.ui.sfx.rememberSfxController
-import com.recuperavc.ui.components.RecuperAVCBrandHeader
+import com.recuperavc.ui.theme.GreenDark
+import com.recuperavc.ui.theme.GreenLight
+import com.recuperavc.ui.util.InitialSettings
+import com.recuperavc.ui.util.PaintSystemBars
+import com.recuperavc.ui.util.rememberInitialSettings
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+private val HighContrastAccent = Color(0xFFFFD600)
 
 @Composable
 fun HomeScreen(
@@ -69,15 +53,55 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onExit: () -> Unit
 ) {
+    val context = LocalContext.current
+    val settings: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context))
+
+    // Block first frame until settings arrive (prevents flashes)
+    val initial: InitialSettings? = rememberInitialSettings(settings)
+    if (initial == null) {
+        PaintSystemBars(background = Color.Black, lightIcons = false)
+        Box(Modifier.fillMaxSize().background(Color.Black)) {}
+        return
+    }
+
+    // Live prefs
+    val appliedDark by settings.darkModeFlow.collectAsState(initial = initial.dark)
+    val appliedContrast by settings.contrastFlow.collectAsState(initial = initial.contrast)
+    val appliedScale by settings.sizeTextFlow.collectAsState(initial = initial.scale)
+
+    // Base palette
+    val background = when {
+        appliedContrast -> Color.Black
+        appliedDark -> Color(0xFF121212)
+        else -> Color.White
+    }
+    val textPrimary = when {
+        appliedContrast -> Color.White
+        appliedDark -> Color(0xFFEAEAEA)
+        else -> Color(0xFF1B1B1B)
+    }
+    val accent = if (appliedContrast) HighContrastAccent else GreenDark
+    val drawerContainer = when {
+        appliedContrast -> Color.Black
+        appliedDark -> Color(0xFF1E1E1E)
+        else -> GreenLight
+    }
+    val drawerTextIcon = Color.White
+    val drawerSelectedContainer = when {
+        appliedContrast || appliedDark -> Color(0xFF222222)
+        else -> Color.White.copy(alpha = 0.16f)
+    }
+
+    PaintSystemBars(background = background, lightIcons = !(appliedContrast || appliedDark))
+
     val drawerState: DrawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    val sfx = rememberSfxController() // short_pop em todos os toques
+    val sfx = rememberSfxController()
 
-    // helper para tocar e atrasar navegação/ações que desmontam a tela
     fun navigateWithClick(action: () -> Unit) {
         scope.launch {
             sfx.play(Sfx.CLICK)
-            delay(140) // deixa o "short_pop" soar antes da navegação desmontar o SoundPool
+            delay(140)
             action()
         }
     }
@@ -87,43 +111,48 @@ fun HomeScreen(
         drawerContent = {
             ModalDrawerSheet(
                 modifier = Modifier.fillMaxWidth(0.78f),
-                drawerContainerColor = GreenLight,
-                drawerContentColor = Color.White
+                drawerContainerColor = drawerContainer,
+                drawerContentColor = drawerTextIcon
             ) {
-                // Header wave
+                // Drawer header wave — decorative; hide in HC
                 Box(modifier = Modifier.fillMaxWidth().height(100.dp)) {
-                    Image(
-                        painter = painterResource(id = R.drawable.wave_light),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.FillBounds
-                    )
+                    if (!appliedContrast) {
+                        Image(
+                            painter = painterResource(
+                                // ✅ light -> wave_light, dark -> wave_green
+                                id = if (appliedDark) R.drawable.wave_green else R.drawable.wave_light
+                            ),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.FillBounds
+                        )
+                    }
                 }
+
                 Spacer(Modifier.height(32.dp))
 
                 NavigationDrawerItem(
-                    label = { Text("Relatórios") },
+                    label = { Text("Relatórios", fontSize = 16.sp * appliedScale, fontWeight = FontWeight.Medium) },
                     selected = false,
                     onClick = {
                         navigateWithClick {
                             onOpenReports()
-                            // fechar o drawer após navegar é opcional, depende do seu NavHost
                             scope.launch { drawerState.close() }
                         }
                     },
-                    icon = { Icon(Icons.Default.Summarize, contentDescription = null) },
+                    icon = { Icon(Icons.Filled.Summarize, contentDescription = null, tint = drawerTextIcon) },
                     colors = NavigationDrawerItemDefaults.colors(
-                        selectedContainerColor = Color.White.copy(alpha = 0.16f),
+                        selectedContainerColor = drawerSelectedContainer,
                         unselectedContainerColor = Color.Transparent,
-                        selectedTextColor = Color.White,
-                        unselectedTextColor = Color.White,
-                        selectedIconColor = Color.White,
-                        unselectedIconColor = Color.White
+                        selectedTextColor = drawerTextIcon,
+                        unselectedTextColor = drawerTextIcon,
+                        selectedIconColor = drawerTextIcon,
+                        unselectedIconColor = drawerTextIcon
                     )
                 )
 
                 NavigationDrawerItem(
-                    label = { Text("Preferências do App") },
+                    label = { Text("Preferências do App", fontSize = 16.sp * appliedScale, fontWeight = FontWeight.Medium) },
                     selected = false,
                     onClick = {
                         navigateWithClick {
@@ -131,21 +160,21 @@ fun HomeScreen(
                             scope.launch { drawerState.close() }
                         }
                     },
-                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                    icon = { Icon(Icons.Filled.Settings, contentDescription = null, tint = drawerTextIcon) },
                     colors = NavigationDrawerItemDefaults.colors(
-                        selectedContainerColor = Color.White.copy(alpha = 0.16f),
+                        selectedContainerColor = drawerSelectedContainer,
                         unselectedContainerColor = Color.Transparent,
-                        selectedTextColor = Color.White,
-                        unselectedTextColor = Color.White,
-                        selectedIconColor = Color.White,
-                        unselectedIconColor = Color.White
+                        selectedTextColor = drawerTextIcon,
+                        unselectedTextColor = drawerTextIcon,
+                        selectedIconColor = drawerTextIcon,
+                        unselectedIconColor = drawerTextIcon
                     )
                 )
 
                 Spacer(Modifier.weight(1f))
-                Divider(color = Color.White.copy(alpha = 0.2f))
+                Divider(color = drawerTextIcon.copy(alpha = 0.2f))
                 NavigationDrawerItem(
-                    label = { Text("Sair") },
+                    label = { Text("Sair", fontSize = 16.sp * appliedScale, fontWeight = FontWeight.Medium) },
                     selected = false,
                     onClick = {
                         navigateWithClick {
@@ -155,33 +184,38 @@ fun HomeScreen(
                     },
                     icon = {
                         Icon(
-                            Icons.Default.Logout,
+                            imageVector = Icons.AutoMirrored.Filled.Logout,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp), // small icon
-                            tint = Color.White
+                            modifier = Modifier.size(18.dp),
+                            tint = drawerTextIcon
                         )
                     },
                     colors = NavigationDrawerItemDefaults.colors(
-                        selectedContainerColor = Color.White.copy(alpha = 0.12f),
+                        selectedContainerColor = drawerSelectedContainer.copy(alpha = 0.6f),
                         unselectedContainerColor = Color.Transparent,
-                        selectedTextColor = Color.White,
-                        unselectedTextColor = Color.White,
-                        selectedIconColor = Color.White,
-                        unselectedIconColor = Color.White
+                        selectedTextColor = drawerTextIcon,
+                        unselectedTextColor = drawerTextIcon,
+                        selectedIconColor = drawerTextIcon,
+                        unselectedIconColor = drawerTextIcon
                     )
                 )
                 Spacer(Modifier.height(8.dp))
             }
         }
     ) {
-        Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+        Box(modifier = Modifier.fillMaxSize().background(background)) {
+
+            // Top header with wave (decorative; hide in HC)
             Box(modifier = Modifier.fillMaxWidth().height(120.dp)) {
-                Image(
-                    painter = painterResource(id = R.drawable.wave_green),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.FillBounds
-                )
+                if (!appliedContrast) {
+                    Image(
+                        // Keep the GREEN wave in the main header for both light & dark
+                        painter = painterResource(id = R.drawable.wave_green),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.FillBounds
+                    )
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -196,7 +230,8 @@ fun HomeScreen(
                             drawerState.open()
                         }
                     }) {
-                        Icon(Icons.Default.Menu, contentDescription = null, tint = OnBackground)
+                        // ✅ Always white in light/dark/HC
+                        Icon(Icons.Filled.Menu, contentDescription = null, tint = Color.White)
                     }
                 }
             }
@@ -214,19 +249,37 @@ fun HomeScreen(
 
                 ActionCard(
                     title = "Teste de raciocínio",
-                    icon = Icons.Default.Psychology,
+                    icon = Icons.Filled.Psychology,
+                    appliedContrast = appliedContrast,
+                    appliedDark = appliedDark,
+                    appliedScale = appliedScale,
+                    accent = accent,
+                    textPrimary = textPrimary,
+                    background = background,
                     onClick = { navigateWithClick(onOpenSentenceTest) }
                 )
                 Spacer(Modifier.height(16.dp))
                 ActionCard(
                     title = "Teste de reconhecimento de voz",
-                    icon = Icons.Default.Mic,
+                    icon = Icons.Filled.Mic,
+                    appliedContrast = appliedContrast,
+                    appliedDark = appliedDark,
+                    appliedScale = appliedScale,
+                    accent = accent,
+                    textPrimary = textPrimary,
+                    background = background,
                     onClick = { navigateWithClick(onOpenAudioTest) }
                 )
                 Spacer(Modifier.height(16.dp))
                 ActionCard(
                     title = "Teste de coordenação motora",
-                    icon = Icons.Default.Gesture,
+                    icon = Icons.Filled.Gesture,
+                    appliedContrast = appliedContrast,
+                    appliedDark = appliedDark,
+                    appliedScale = appliedScale,
+                    accent = accent,
+                    textPrimary = textPrimary,
+                    background = background,
                     onClick = { navigateWithClick(onOpenMotionTest) }
                 )
             }
@@ -238,18 +291,56 @@ fun HomeScreen(
 private fun ActionCard(
     title: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
+    appliedContrast: Boolean,
+    appliedDark: Boolean,
+    appliedScale: Float,
+    accent: Color,
+    textPrimary: Color,
+    background: Color,
     onClick: () -> Unit
 ) {
+    val containerColor: Color
+    val contentColor: Color
+    val chipBg: Color
+    val chipIcon: Color
+    val borderColor: Color?
+
+    if (appliedContrast) {
+        containerColor = Color.Black
+        contentColor = Color.White
+        chipBg = accent
+        chipIcon = Color.Black
+        borderColor = accent
+    } else if (appliedDark) {
+        containerColor = Color(0xFF1E1E1E)
+        contentColor = Color.White
+        chipBg = GreenDark
+        chipIcon = Color.White
+        borderColor = null
+    } else {
+        containerColor = GreenLight
+        contentColor = Color.White
+        chipBg = GreenDark
+        chipIcon = Color.White
+        borderColor = null
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .height(96.dp)
+            .then(
+                if (borderColor != null)
+                    Modifier.border(width = 2.dp, color = borderColor, shape = RoundedCornerShape(12.dp))
+                else Modifier
+            )
+            .clip(RoundedCornerShape(12.dp))
             .clickable { onClick() },
         colors = CardDefaults.cardColors(
-            containerColor = GreenLight,
-            contentColor = Color.White
+            containerColor = containerColor,
+            contentColor = contentColor
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast) 0.dp else 8.dp),
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(
@@ -262,16 +353,16 @@ private fun ActionCard(
                 modifier = Modifier
                     .size(64.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(GreenDark),
+                    .background(chipBg),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
+                Icon(icon, contentDescription = null, tint = chipIcon, modifier = Modifier.size(32.dp))
             }
             Spacer(Modifier.width(16.dp))
             Text(
                 text = title,
-                color = Color.White,
-                fontSize = 18.sp,
+                color = contentColor,
+                fontSize = 18.sp * appliedScale,
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Start
             )

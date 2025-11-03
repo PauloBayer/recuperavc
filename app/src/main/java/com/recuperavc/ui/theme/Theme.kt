@@ -10,6 +10,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -26,6 +27,8 @@ private val LightColorScheme = lightColorScheme(
     secondary = GreenLight,
     tertiary = GreenAccent
 )
+
+public val HighContrastAccent = Color(0xFFFFD600)
 
 @Composable
 fun WhisperCppDemoTheme(
