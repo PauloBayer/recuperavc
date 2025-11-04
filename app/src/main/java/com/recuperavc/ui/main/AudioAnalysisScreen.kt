@@ -1,5 +1,10 @@
 package com.recuperavc.ui.main
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -19,7 +24,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.TrendingUp
@@ -385,6 +391,68 @@ private fun AudioAnalysisContent(
                     )
                 }
 
+                val chipContainer = when {
+                    appliedContrast -> Color.Black
+                    appliedDark -> Color(0xFF2A2A2A)
+                    else -> Color.White.copy(alpha = 0.96f)
+                }
+                val chipLabel = when {
+                    appliedContrast -> Color.White
+                    appliedDark -> Color(0xFFEDEDED)
+                    else -> Color(0xFF1B1B1B)
+                }
+                val chipBorder = when {
+                    appliedContrast -> BorderStroke(1.dp, accent.copy(alpha = 0.7f))
+                    appliedDark -> BorderStroke(1.dp, Color.White.copy(alpha = 0.10f))
+                    else -> null
+                }
+                val chipIconBg = when {
+                    appliedContrast -> accent
+                    appliedDark -> GreenDark
+                    else -> GreenDark
+                }
+                val chipIconTint = if (appliedContrast) Color.Black else Color.White
+                AnimatedVisibility(
+                    visible = isRecording && !isProcessing && !isCancelling,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Card(
+                        shape = RoundedCornerShape(50),
+                        colors = CardDefaults.cardColors(containerColor = chipContainer),
+                        elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 3.dp),
+                        border = chipBorder,
+                        modifier = Modifier.padding(top = 12.dp, bottom = 12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clip(CircleShape)
+                                    .background(chipIconBg),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Info,
+                                    contentDescription = null,
+                                    tint = chipIconTint,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "Toque no botão grande novamente para enviar agora",
+                                fontSize = 14.sp * appliedScale,
+                                color = chipLabel
+                            )
+                        }
+                    }
+                }
+
                 Text(
                     text = phraseText,
                     fontSize = 24.sp * appliedScale,
@@ -425,14 +493,14 @@ private fun AudioAnalysisContent(
                                 contentColor = Color.White
                             ),
                             modifier = Modifier
-                                .size(56.dp)
+                                .size(64.dp)
                                 .align(Alignment.CenterHorizontally),
                             shape = CircleShape
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Cancel,
+                                imageVector = Icons.Default.Close,
                                 contentDescription = "Cancelar gravação",
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(36.dp)
                             )
                         }
                     }

@@ -805,6 +805,8 @@ fun SentenceResultScreen(
         )
         Spacer(Modifier.height(8.dp))
 
+
+
         results.forEachIndexed { idx, r ->
             ResultItemCard(
                 appliedContrast = appliedContrast,
