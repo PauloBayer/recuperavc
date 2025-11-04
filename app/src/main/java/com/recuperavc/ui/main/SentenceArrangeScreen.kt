@@ -54,6 +54,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import com.recuperavc.library.PhraseManager
+import com.recuperavc.ui.components.*
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import com.recuperavc.ui.theme.GreenDark
 
 /* ------------------------- Paleta base ---------------------------- */
 private val Olive = Color(0xFF5E6F48)
@@ -738,7 +744,6 @@ fun SentenceResultScreen(
     appliedDark: Boolean,
     appliedScale: Float,
     bgOverlay: Color,
-    // incoming palette (still accepted; we’ll override for dark/HC where needed)
     cardContainer: Color,
     titleColor: Color,
     primaryBtnContainer: Color,
@@ -748,138 +753,169 @@ fun SentenceResultScreen(
     onBackToHome: () -> Unit = {},
     onRestart: () -> Unit = {}
 ) {
-    val container = when {
-        appliedContrast -> Color.Black
-        appliedDark     -> Color(0xFF121212)
-        else            -> cardContainer
-    }
+    val accent = if (appliedContrast) HighContrastAccent else GreenDark
 
-    val titleCol = when {
-        appliedContrast -> HighContrastAccent
-        appliedDark     -> Color.White
-        else            -> titleColor
-    }
+    val totalTries = results.sumOf { it.tries.size }
+    val correctTries = results.sumOf { it.tries.count { tryItem -> tryItem.correct } }
+    val successRate = if (totalTries > 0) (correctTries.toFloat() / totalTries.toFloat() * 100f) else 0f
+    val avgTime = if (results.isNotEmpty()) results.map { it.timeElapsed }.average().toFloat() / 1000f else 0f
 
-    val itemContainer = when {
-        appliedContrast -> Color(0xFF181818)
-        appliedDark     -> Color(0xFF1E1E1E)
-        else            -> CardTintLight
-    }
-
-    val itemText = when {
-        appliedContrast -> Color.White
-        appliedDark     -> Color(0xFFEDEDED)
-        else            -> Color.Black
-    }
-
-    val itemBorder = when {
-        appliedContrast -> BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
-        appliedDark     -> BorderStroke(1.dp, Color.White.copy(alpha = 0.06f))
-        else            -> null
-    }
-
-    val listDivider = when {
-        appliedContrast -> Color.White.copy(alpha = 0.08f)
-        appliedDark     -> Color.White.copy(alpha = 0.06f)
-        else            -> Color(0xFFE0E0E0)
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(bgOverlay),
-        contentAlignment = Alignment.Center
+    ResultDialogContainer(
+        appliedContrast = appliedContrast,
+        appliedDark = appliedDark
     ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp)
-                .wrapContentHeight(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = container),
-            elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast) 0.dp else 6.dp),
-            border = if (appliedContrast) BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)) else null
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    "Resultados Finais",
-                    fontSize = 22.sp * appliedScale,
-                    fontWeight = FontWeight.Bold,
-                    color = titleCol
-                )
-                Spacer(Modifier.height(16.dp))
+        ResultTitle(
+            text = "Resultados Finais",
+            appliedContrast = appliedContrast,
+            appliedDark = appliedDark,
+            appliedScale = appliedScale,
+            accent = accent
+        )
+        Spacer(Modifier.height(16.dp))
 
-                results.forEachIndexed { idx, r ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = itemContainer),
-                        elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 1.dp),
-                        border = itemBorder
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            ResultMetricCard(
+                title = "Taxa de acerto",
+                value = String.format("%.0f", successRate),
+                unit = "%",
+                color = accent,
+                icon = Icons.Default.CheckCircle,
+                appliedContrast = appliedContrast,
+                appliedDark = appliedDark,
+                appliedScale = appliedScale
+            )
+            ResultMetricCard(
+                title = "Tempo médio",
+                value = String.format("%.1f", avgTime),
+                unit = "s",
+                color = accent,
+                icon = Icons.Default.Timer,
+                appliedContrast = appliedContrast,
+                appliedDark = appliedDark,
+                appliedScale = appliedScale
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+
+        ResultSectionLabel(
+            text = "Frases montadas",
+            appliedContrast = appliedContrast,
+            appliedDark = appliedDark,
+            appliedScale = appliedScale
+        )
+        Spacer(Modifier.height(8.dp))
+
+        results.forEachIndexed { idx, r ->
+            ResultItemCard(
+                appliedContrast = appliedContrast,
+                appliedDark = appliedDark
+            ) {
+                ResultItemText(
+                    text = "${idx + 1}. ${phrases.getOrNull(idx) ?: "—"}",
+                    appliedContrast = appliedContrast,
+                    appliedDark = appliedDark,
+                    appliedScale = appliedScale,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16f
+                )
+                Spacer(Modifier.height(8.dp))
+
+                if (r.tries.size > 1) {
+                    ResultItemText(
+                        text = "Tentativas: ${r.tries.size}",
+                        appliedContrast = appliedContrast,
+                        appliedDark = appliedDark,
+                        appliedScale = appliedScale,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 13f
+                    )
+                    Spacer(Modifier.height(6.dp))
+                }
+
+                r.tries.forEachIndexed { tryIdx, tryItem ->
+                    val tryColor = if (tryItem.correct) accent else Color(0xFFD32F2F)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                text = "Frase correta: ${phrases.getOrNull(idx) ?: "—"}",
-                                color = itemText,
-                                fontSize = 16.sp * appliedScale,
-                                fontWeight = FontWeight.Bold
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (tryItem.correct) Icons.Default.Check else Icons.Default.Close,
+                                contentDescription = null,
+                                tint = tryColor,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            ResultItemText(
+                                text = if (r.tries.size > 1) "${tryIdx + 1}ª: ${tryItem.typedPhrase}" else tryItem.typedPhrase,
+                                appliedContrast = appliedContrast,
+                                appliedDark = appliedDark,
+                                appliedScale = appliedScale,
+                                fontSize = 14f
+                            )
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Timer,
+                                contentDescription = null,
+                                tint = tryColor,
+                                modifier = Modifier.size(12.dp)
                             )
                             Text(
-                                text = "Sua frase: ${r.typedPhrase}",
-                                color = itemText.copy(alpha = 0.95f),
-                                fontSize = 14.sp * appliedScale
-                            )
-                            Text(
-                                text = "Tempo: ${formatTime(r.timeElapsed)}",
-                                color = itemText.copy(alpha = 0.75f),
-                                fontSize = 12.sp * appliedScale
+                                formatTime(tryItem.elapsedMs),
+                                color = tryColor,
+                                fontSize = 12.sp * appliedScale,
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
-                }
-
-                Spacer(Modifier.height(20.dp))
-
-                Button(
-                    onClick = { sfx.play(Sfx.CLICK); onRestart() },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = primaryBtnContainer,
-                        contentColor = primaryBtnContent
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp)
-                ) { Text("Reiniciar teste", fontSize = 16.sp * appliedScale, fontWeight = FontWeight.SemiBold) }
-
-                Spacer(Modifier.height(8.dp))
-
-                if (appliedContrast) {
-                    OutlinedButton(
-                        onClick = { sfx.play(Sfx.CLICK); onBackToHome() },
-                        border = BorderStroke(2.dp, HighContrastAccent),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = HighContrastAccent),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp)
-                    ) { Text("Voltar para tela inicial", fontSize = 16.sp * appliedScale, fontWeight = FontWeight.SemiBold) }
-                } else {
-                    Button(
-                        onClick = { sfx.play(Sfx.CLICK); onBackToHome() },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = secondaryBtnContainer,
-                            contentColor = secondaryBtnContent
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp)
-                    ) { Text("Voltar para tela inicial", fontSize = 16.sp * appliedScale, fontWeight = FontWeight.SemiBold) }
+                    if (tryIdx < r.tries.size - 1) {
+                        Spacer(Modifier.height(4.dp))
+                    }
                 }
             }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        Button(
+            onClick = { sfx.play(Sfx.CLICK); onRestart() },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = accent,
+                contentColor = if (appliedContrast) Color.Black else Color.White
+            ),
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp)
+        ) { Text("Reiniciar teste", fontSize = 16.sp * appliedScale, fontWeight = FontWeight.SemiBold) }
+
+        Spacer(Modifier.height(8.dp))
+
+        if (appliedContrast) {
+            OutlinedButton(
+                onClick = { sfx.play(Sfx.CLICK); onBackToHome() },
+                border = BorderStroke(2.dp, accent),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = accent),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp)
+            ) { Text("Voltar ao Início", fontSize = 16.sp * appliedScale, fontWeight = FontWeight.SemiBold) }
+        } else {
+            Button(
+                onClick = { sfx.play(Sfx.CLICK); onBackToHome() },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = secondaryBtnContainer,
+                    contentColor = secondaryBtnContent
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp)
+            ) { Text("Voltar ao Início", fontSize = 16.sp * appliedScale, fontWeight = FontWeight.SemiBold) }
         }
     }
 }
