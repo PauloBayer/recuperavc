@@ -45,6 +45,9 @@ import com.recuperavc.ui.factory.SettingsViewModelFactory
 import com.recuperavc.ui.util.InitialSettings
 import com.recuperavc.ui.util.PaintSystemBars
 import com.recuperavc.ui.util.rememberInitialSettings
+import com.recuperavc.ui.components.*
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.TouchApp
 
 private enum class MotionMode { MOVING, STATIC }
 private enum class Hand { RIGHT, LEFT }
@@ -61,7 +64,13 @@ fun MotionTestScreen(
     onBack: () -> Unit = {}
 ) {
     val sfx = rememberSfxController()
-    BackHandler(enabled = true) { sfx.play(Sfx.CLICK); onBack() }
+
+    var showEndDialog by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = true) {
+        sfx.play(Sfx.CLICK)
+        showEndDialog = true
+    }
 
     val context = LocalContext.current
     val settings: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context))
@@ -123,6 +132,73 @@ fun MotionTestScreen(
 
     fun durationFor(mode: MotionMode?) =
         if (mode == MotionMode.STATIC) durationSecondsWithoutMovement else durationSecondsWithMovement
+
+    if (showEndDialog) {
+        val container = when {
+            appliedContrast -> Color.Black
+            appliedDark -> Color(0xFF1E1E1E)
+            else -> Color.White
+        }
+        val titleColor = if (appliedContrast) accentSolid else if (appliedDark) Color.White else Color(0xFF1B1B1B)
+        val bodyColor = if (appliedContrast || appliedDark) Color.White else Color(0xFF3A3A3A)
+        val confirmContainer = when {
+            appliedContrast -> accentSolid
+            appliedDark -> GreenDark
+            else -> Color.White
+        }
+        val confirmContent = when {
+            appliedContrast -> Color.Black
+            appliedDark -> Color.White
+            else -> Color(0xFF2E7D32)
+        }
+        val dismissContent = when {
+            appliedContrast -> accentSolid
+            appliedDark -> Color(0xFF8BC34A)
+            else -> GreenDark
+        }
+
+        AlertDialog(
+            onDismissRequest = { sfx.play(Sfx.BUBBLE); showEndDialog = false },
+            containerColor = container,
+            titleContentColor = titleColor,
+            textContentColor = bodyColor,
+            confirmButton = {
+                Button(
+                    onClick = {
+                        sfx.play(Sfx.CLICK)
+                        showEndDialog = false
+                        onBack()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = confirmContainer,
+                        contentColor = confirmContent
+                    ),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text("Sair", fontSize = 16.sp * appliedScale)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { sfx.play(Sfx.CLICK); showEndDialog = false },
+                    colors = ButtonDefaults.textButtonColors(contentColor = dismissContent)
+                ) { Text("Continuar", fontSize = 16.sp * appliedScale) }
+            },
+            title = {
+                Text("Encerrar sessão", fontWeight = FontWeight.SemiBold, fontSize = 20.sp * appliedScale)
+            },
+            text = {
+                val message = if (testStarted && !finished) {
+                    "O teste está em andamento. Se sair agora, o progresso será perdido."
+                } else if (finished) {
+                    "Deseja voltar para a tela inicial?"
+                } else {
+                    "Deseja cancelar e voltar para a tela inicial?"
+                }
+                Text(message, fontSize = 15.sp * appliedScale, lineHeight = 20.sp * appliedScale)
+            }
+        )
+    }
 
     @Suppress("UnusedBoxWithConstraintsScope")
     BoxWithConstraints(
@@ -214,7 +290,7 @@ fun MotionTestScreen(
                 horizontalArrangement = Arrangement.Start,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { sfx.play(Sfx.CLICK); onBack() }) {
+                IconButton(onClick = { sfx.play(Sfx.CLICK); showEndDialog = true }) {
                     Icon(
                         imageVector = Icons.Filled.ArrowBack,
                         contentDescription = "Voltar",
@@ -379,119 +455,26 @@ fun MotionTestScreen(
 
         // RESULTS
         if (finished) {
-            val scrollState = rememberScrollState()
-
-            val surfaceColor = when {
-                appliedContrast -> Color.Black
-                appliedDark -> Color(0xFF161717)
-                else -> Color.White
-            }
-            val cardColor = when {
-                appliedContrast -> Color.Black
-                appliedDark -> Color(0xFF1E1F1F)
-                else -> Color(0xFFF4F8F1)
-            }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(surfaceColor)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(scrollState)
-                        .padding(horizontal = 16.dp)
-                        .padding(top = 16.dp, bottom = 96.dp),
-                    verticalArrangement = Arrangement.Top,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("Fim do teste!", fontSize = (22.sp * appliedScale), color = textPrimary, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(12.dp))
-
-                    lastReport?.let { report ->
-                        ReportCard(
-                            report = report,
-                            container = cardColor,
-                            border = if (appliedContrast) BorderStroke(2.dp, HighContrastAccent) else null,
-                            titleColor = if (appliedContrast) HighContrastAccent else accentSolid,
-                            textPrimary = textPrimary,
-                            textSecondary = textSecondary,
-                            scale = appliedScale
-                        )
-                        Spacer(Modifier.height(16.dp))
-                    }
-
-                    Divider(thickness = 1.dp, color = dividerColor)
-                    Spacer(Modifier.height(12.dp))
-
-                    if (history.isNotEmpty()) {
-                        Text("Relatórios recentes", fontSize = (18.sp * appliedScale), color = textPrimary, fontWeight = FontWeight.Medium)
-                        Spacer(Modifier.height(8.dp))
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            history.take(5).forEach { r ->
-                                SmallReportRow(
-                                    report = r,
-                                    container = if (appliedContrast) Color.Black else if (appliedDark) Color(0xFF1C1D1D) else Color(0xFFFAFAFA),
-                                    border = if (appliedContrast) BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)) else null,
-                                    textPrimary = textPrimary,
-                                    textSecondary = textSecondary,
-                                    scale = appliedScale
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Bottom actions
-                Surface(
-                    tonalElevation = if (appliedContrast) 0.dp else 3.dp,
-                    shadowElevation = if (appliedContrast) 0.dp else 6.dp,
-                    color = surfaceColor,
-                    border = if (appliedContrast) BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)) else null,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                            .windowInsetsPadding(WindowInsets.navigationBars)
-                    ) {
-                        Button(
-                            onClick = {
-                                sfx.play(Sfx.CLICK)
-                                selectedHand = null
-                                isDominant = null
-                                chosenMode = null
-                                testStarted = false
-                                finished = false
-                                clicks = 0
-                                missedClicks = 0
-                                timeLeft = durationSecondsWithMovement
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = accentAlt,
-                                contentColor = buttonFgOnAccent
-                            ),
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(14.dp)
-                        ) { Text("Novo teste", color = buttonFgOnAccent, fontSize = (16.sp * appliedScale), fontWeight = FontWeight.SemiBold) }
-
-                        Button(
-                            onClick = { sfx.play(Sfx.CLICK); onBack() },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = accentSolid,
-                                contentColor = buttonFgOnAccent
-                            ),
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(14.dp)
-                        ) { Text("Voltar", color = buttonFgOnAccent, fontSize = (16.sp * appliedScale), fontWeight = FontWeight.SemiBold) }
-                    }
-                }
-            }
+            MotionResultScreen(
+                lastReport = lastReport,
+                history = history,
+                appliedContrast = appliedContrast,
+                appliedDark = appliedDark,
+                appliedScale = appliedScale,
+                accentSolid = accentSolid,
+                onNewTest = {
+                    sfx.play(Sfx.CLICK)
+                    selectedHand = null
+                    isDominant = null
+                    chosenMode = null
+                    testStarted = false
+                    finished = false
+                    clicks = 0
+                    missedClicks = 0
+                    timeLeft = durationSecondsWithMovement
+                },
+                onBack = { sfx.play(Sfx.CLICK); showEndDialog = true }
+            )
         }
     }
 }
@@ -565,83 +548,179 @@ private fun BigSelectButton(
     ) { Text(label, fontSize = (14.sp * appliedScale)) }
 }
 
-/* ----------------------------- Report cards ----------------------------- */
-
+/* ------------------------- Motion Result Screen ---------------------------- */
 @Composable
-private fun ReportCard(
-    report: MotionReport,
-    container: Color,
-    border: BorderStroke?,
-    titleColor: Color,
-    textPrimary: Color,
-    textSecondary: Color,
-    scale: Float
+private fun MotionResultScreen(
+    lastReport: MotionReport?,
+    history: List<MotionReport>,
+    appliedContrast: Boolean,
+    appliedDark: Boolean,
+    appliedScale: Float,
+    accentSolid: Color,
+    onNewTest: () -> Unit,
+    onBack: () -> Unit
 ) {
-    val dateStr = remember(report.date) {
-        LocalDateTime.ofInstant(report.date, ZoneId.systemDefault())
-            .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
-    }
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = container),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (border != null) 0.dp else 2.dp),
-        border = border,
-        shape = RoundedCornerShape(14.dp)
+    ResultDialogContainer(
+        appliedContrast = appliedContrast,
+        appliedDark = appliedDark
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Text("Relatório do teste", fontSize = (18.sp * scale), color = titleColor, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(8.dp))
-            Text("Data/Hora: $dateStr", fontSize = (14.sp * scale), color = textPrimary)
-            Text("Duração: ${report.secondsTotal.toInt()}s", fontSize = (14.sp * scale), color = textPrimary)
-            Text("Cliques totais: ${report.totalClicks}", fontSize = (14.sp * scale), color = textPrimary)
-            Text("Cliques por minuto: ${report.clicksPerMinute}", fontSize = (14.sp * scale), color = textPrimary)
-            Text("Cliques errados: ${report.missedClicks}", fontSize = (14.sp * scale), color = textPrimary)
-            Spacer(Modifier.height(8.dp))
-            Text("Mão usada: ${if (report.withRightHand) "Direita" else "Esquerda"}", fontSize = (14.sp * scale), color = textSecondary)
-            Text("Mão dominante: ${if (report.withMainHand) "Sim" else "Não"}", fontSize = (14.sp * scale), color = textSecondary)
-            Text("Modo: ${if (report.withMovement) "Com movimento" else "Sem movimento"}", fontSize = (14.sp * scale), color = textSecondary)
-        }
-    }
-}
+        ResultTitle(
+            text = "Resultado do Teste",
+            appliedContrast = appliedContrast,
+            appliedDark = appliedDark,
+            appliedScale = appliedScale,
+            accent = accentSolid
+        )
+        Spacer(Modifier.height(16.dp))
 
-@Composable
-private fun SmallReportRow(
-    report: MotionReport,
-    container: Color,
-    border: BorderStroke?,
-    textPrimary: Color,
-    textSecondary: Color,
-    scale: Float
-) {
-    val dateStr = remember(report.date) {
-        LocalDateTime.ofInstant(report.date, ZoneId.systemDefault())
-            .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
-    }
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = container),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (border != null) 0.dp else 1.dp),
-        border = border,
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text("• $dateStr", fontSize = (13.sp * scale), color = textPrimary)
-                Text(
-                    "   ${report.totalClicks} cliques • ${report.clicksPerMinute} cpm • ${report.missedClicks} errados",
-                    fontSize = (13.sp * scale),
-                    color = textSecondary
+        lastReport?.let { report ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                ResultMetricCard(
+                    title = "Cliques/min",
+                    value = "${report.clicksPerMinute}",
+                    unit = "CPM",
+                    color = accentSolid,
+                    icon = Icons.Default.Speed,
+                    appliedContrast = appliedContrast,
+                    appliedDark = appliedDark,
+                    appliedScale = appliedScale
                 )
+                ResultMetricCard(
+                    title = "Total cliques",
+                    value = "${report.totalClicks}",
+                    unit = "",
+                    color = accentSolid,
+                    icon = Icons.Default.TouchApp,
+                    appliedContrast = appliedContrast,
+                    appliedDark = appliedDark,
+                    appliedScale = appliedScale
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+
+            ResultSectionLabel(
+                text = "Detalhes",
+                appliedContrast = appliedContrast,
+                appliedDark = appliedDark,
+                appliedScale = appliedScale
+            )
+            Spacer(Modifier.height(8.dp))
+
+            ResultItemCard(
+                appliedContrast = appliedContrast,
+                appliedDark = appliedDark
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        ResultItemText(
+                            text = "Duração",
+                            appliedContrast = appliedContrast,
+                            appliedDark = appliedDark,
+                            appliedScale = appliedScale,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 13f
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "${report.secondsTotal.toInt()}s",
+                            fontSize = 16.sp * appliedScale,
+                            fontWeight = FontWeight.Bold,
+                            color = accentSolid
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        ResultItemText(
+                            text = "Cliques errados",
+                            appliedContrast = appliedContrast,
+                            appliedDark = appliedDark,
+                            appliedScale = appliedScale,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 13f
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "${report.missedClicks}",
+                            fontSize = 16.sp * appliedScale,
+                            fontWeight = FontWeight.Bold,
+                            color = accentSolid
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                ResultItemText(
+                    text = "Mão: ${if (report.withRightHand) "Direita" else "Esquerda"} ${if (report.withMainHand) "(Dominante)" else "(Não dominante)"}",
+                    appliedContrast = appliedContrast,
+                    appliedDark = appliedDark,
+                    appliedScale = appliedScale,
+                    fontSize = 14f
+                )
+                Spacer(Modifier.height(4.dp))
+                ResultItemText(
+                    text = "Modo: ${if (report.withMovement) "Com movimento" else "Sem movimento"}",
+                    appliedContrast = appliedContrast,
+                    appliedDark = appliedDark,
+                    appliedScale = appliedScale,
+                    fontSize = 14f
+                )
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        Button(
+            onClick = onNewTest,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = accentSolid,
+                contentColor = if (appliedContrast) Color.Black else Color.White
+            ),
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Text(
+                "Novo teste",
+                color = if (appliedContrast) Color.Black else Color.White,
+                fontSize = 16.sp * appliedScale,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        if (appliedContrast) {
+            OutlinedButton(
+                onClick = onBack,
+                border = BorderStroke(2.dp, accentSolid),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = accentSolid),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp)
+            ) {
                 Text(
-                    "   ${if (report.withRightHand) "Mão direita" else "Mão esquerda"} • " +
-                            (if (report.withMainHand) "Dominante" else "Não dominante") + " • " +
-                            (if (report.withMovement) "Com movimento" else "Sem movimento"),
-                    fontSize = (12.sp * scale),
-                    color = textSecondary
+                    "Voltar ao Início",
+                    fontSize = 16.sp * appliedScale,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        } else {
+            Button(
+                onClick = onBack,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = GreenAccent,
+                    contentColor = Color.White
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(
+                    "Voltar ao Início",
+                    color = Color.White,
+                    fontSize = 16.sp * appliedScale,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }

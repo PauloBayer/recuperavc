@@ -22,15 +22,20 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.recuperavc.models.SettingsViewModel
 import com.recuperavc.models.relations.AudioReportWithFiles
+import com.recuperavc.ui.factory.SettingsViewModelFactory
+import com.recuperavc.ui.util.InitialSettings
+import com.recuperavc.ui.util.rememberInitialSettings
 import com.recuperavc.ui.main.reports.type.ChartType
 import com.recuperavc.ui.main.reports.components.BarChart
 import com.recuperavc.ui.main.reports.components.ChartCard
-import com.recuperavc.ui.theme.GreenDark
 import com.recuperavc.ui.theme.LocalReportsPalette
 import kotlinx.coroutines.delay
 import org.json.JSONObject
@@ -41,8 +46,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.sin
 
-private val HighContrastAccent = Color(0xFFFFD600)
 private fun Color.luma(): Float = 0.299f * red + 0.587f * green + 0.114f * blue
+private val Color.on: Color get() = if (luma() > 0.6f) Color.Black else Color.White
 
 @Composable
 fun AudioReportSection(
@@ -51,35 +56,31 @@ fun AudioReportSection(
     onBarTapSound: () -> Unit
 ) {
     val p = LocalReportsPalette.current
-    val isHC = p.textPrimary.luma() > 0.8f
-    val isLight = p.bg.luma() > 0.7f && !isHC
-    val accent = if (isHC) HighContrastAccent else GreenDark
 
-    val cardColor = p.surface
-    val textPrimary = p.textPrimary
-    val textSecondary = p.textPrimary.copy(alpha = 0.70f)
-    val softTile = if (isHC) Color.Black else if (isLight) Color(0xFFF5F5F5) else Color(0xFF1E1F1F)
-    val borderHC = if (isHC) BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)) else null
+    val context = LocalContext.current
+    val settings: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context))
+    val initial: InitialSettings? = rememberInitialSettings(settings)
+    val appliedScale = settings.sizeTextFlow.collectAsState(initial = initial?.scale ?: 1f).value
 
     if (items.isEmpty()) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = cardColor),
-            elevation = CardDefaults.cardElevation(defaultElevation = if (borderHC != null) 0.dp else 4.dp),
-            border = borderHC
+            colors = CardDefaults.cardColors(containerColor = p.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = if (p.borderSoft != null) 0.dp else 4.dp),
+            border = p.borderSoft?.let { BorderStroke(1.dp, it) }
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(Icons.Default.Mic, contentDescription = null, tint = textSecondary, modifier = Modifier.size(64.dp))
+                Icon(Icons.Default.Mic, contentDescription = null, tint = p.textSecondary, modifier = Modifier.size(64.dp))
                 Spacer(Modifier.height(16.dp))
                 Text(
                     text = "Nenhum relatório encontrado",
-                    fontSize = 18.sp,
+                    fontSize = (18.sp * appliedScale),
                     fontWeight = FontWeight.Bold,
-                    color = textSecondary,
+                    color = p.textSecondary,
                     textAlign = TextAlign.Center
                 )
             }
@@ -89,8 +90,8 @@ fun AudioReportSection(
 
     Text(
         text = "Toque nas barras para ver detalhes",
-        fontSize = 16.sp,
-        color = accent,
+        fontSize = (16.sp * appliedScale),
+        color = p.accent,
         fontWeight = FontWeight.SemiBold,
         textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth()
@@ -133,12 +134,12 @@ fun AudioReportSection(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = cardColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (borderHC != null) 0.dp else 4.dp),
-        border = borderHC
+        colors = CardDefaults.cardColors(containerColor = p.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (p.borderSoft != null) 0.dp else 4.dp),
+        border = p.borderSoft?.let { BorderStroke(1.dp, it) }
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Text("Últimos Testes Realizados", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = textPrimary)
+            Text("Últimos Testes Realizados", fontWeight = FontWeight.Bold, fontSize = (18.sp * appliedScale), color = p.textPrimary)
             Spacer(Modifier.height(12.dp))
             items.takeLast(5).reversed().forEachIndexed { idx, r ->
                 val date = r.files.minByOrNull { it.recordedAt ?: Instant.EPOCH }?.recordedAt
@@ -150,19 +151,19 @@ fun AudioReportSection(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
-                        .background(softTile)
+                        .background(p.surfaceVariant)
                         .padding(12.dp)
                 ) {
-                    Text("Data: $label", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = textPrimary)
+                    Text("Data: $label", fontWeight = FontWeight.Bold, fontSize = (16.sp * appliedScale), color = p.textPrimary)
                     Spacer(Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Velocidade", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = textSecondary)
-                            Text("${r.report.averageWordsPerMinute.toInt()} palavras/min", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = accent)
+                            Text("Velocidade", fontSize = (13.sp * appliedScale), fontWeight = FontWeight.SemiBold, color = p.textSecondary)
+                            Text("${r.report.averageWordsPerMinute.toInt()} palavras/min", fontSize = (15.sp * appliedScale), fontWeight = FontWeight.Bold, color = p.accent)
                         }
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Precisão", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = textSecondary)
-                            Text("${String.format("%.1f", 100 - r.report.averageWordErrorRate)}%", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = accent)
+                            Text("Precisão", fontSize = (13.sp * appliedScale), fontWeight = FontWeight.SemiBold, color = p.textSecondary)
+                            Text("${String.format("%.1f", 100 - r.report.averageWordErrorRate)}%", fontSize = (15.sp * appliedScale), fontWeight = FontWeight.Bold, color = p.accent)
                         }
                     }
                 }
@@ -182,13 +183,11 @@ fun AudioReportDetailDialog(
     onAnyTap: () -> Unit
 ) {
     val p = LocalReportsPalette.current
-    val isHC = p.textPrimary.luma() > 0.8f
-    val accent = if (isHC) HighContrastAccent else GreenDark
-    val cardColor = p.surface
-    val textPrimary = p.textPrimary
-    val textSecondary = p.textPrimary.copy(alpha = 0.70f)
-    val tile = if (isHC) Color.Black else if (p.bg.luma() > 0.7f && !isHC) Color(0xFFF5F5F5) else Color(0xFF1E1F1F)
-    val borderHC = if (isHC) BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)) else null
+
+    val context = LocalContext.current
+    val settings: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context))
+    val initial: InitialSettings? = rememberInitialSettings(settings)
+    val appliedScale = settings.sizeTextFlow.collectAsState(initial = initial?.scale ?: 1f).value
 
     val attempts = remember(report.report.allTestsDescription) { parseAudioReportDetails(report.report.allTestsDescription) }
     val attemptsByFileId = remember(attempts) { attempts.associateBy { it.fileId } }
@@ -215,9 +214,9 @@ fun AudioReportDetailDialog(
                 .padding(24.dp)
                 .align(Alignment.Center),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = cardColor),
-            elevation = CardDefaults.cardElevation(defaultElevation = if (borderHC != null) 0.dp else 8.dp),
-            border = borderHC
+            colors = CardDefaults.cardColors(containerColor = p.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = if (p.borderSoft != null) 0.dp else 8.dp),
+            border = p.borderSoft?.let { BorderStroke(1.dp, it) }
         ) {
             Column(
                 modifier = Modifier
@@ -226,7 +225,7 @@ fun AudioReportDetailDialog(
                     .verticalScroll(rememberScrollState())
                     .padding(20.dp)
             ) {
-                Text("Áudios do Teste", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = textPrimary)
+                Text("Áudios do Teste", fontWeight = FontWeight.Bold, fontSize = (22.sp * appliedScale), color = p.textPrimary)
                 Spacer(Modifier.height(4.dp))
                 val filesSorted = remember(report.files) { report.files.sortedBy { it.recordedAt } }
                 val date = filesSorted.minByOrNull { it.recordedAt }?.recordedAt
@@ -234,15 +233,15 @@ fun AudioReportDetailDialog(
                     val localDate = LocalDateTime.ofInstant(date, ZoneId.systemDefault())
                     Text(
                         text = "Realizado em ${DateTimeFormatter.ofPattern("dd/MM/yyyy").format(localDate)}",
-                        fontSize = 15.sp,
+                        fontSize = (15.sp * appliedScale),
                         fontWeight = FontWeight.SemiBold,
-                        color = textSecondary
+                        color = p.textSecondary
                     )
                 }
                 Spacer(Modifier.height(16.dp))
 
                 if (filesSorted.isNotEmpty()) {
-                    Text("Total: ${filesSorted.size} áudio(s)", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = accent)
+                    Text("Total: ${filesSorted.size} áudio(s)", fontWeight = FontWeight.Bold, fontSize = (17.sp * appliedScale), color = p.accent)
                     Spacer(Modifier.height(12.dp))
 
                     filesSorted.forEachIndexed { idx, audioFile ->
@@ -251,7 +250,7 @@ fun AudioReportDetailDialog(
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = tile)
+                            colors = CardDefaults.cardColors(containerColor = p.surfaceVariant)
                         ) {
                             Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
                                 Row(
@@ -259,7 +258,7 @@ fun AudioReportDetailDialog(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("Áudio ${idx + 1}", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = textPrimary)
+                                    Text("Áudio ${idx + 1}", fontWeight = FontWeight.Bold, fontSize = (17.sp * appliedScale), color = p.textPrimary)
                                     IconButton(
                                         onClick = {
                                             onAnyTap()
@@ -285,13 +284,13 @@ fun AudioReportDetailDialog(
                                         }
                                     ) {
                                         Icon(if (currentlyPlayingIndex == idx) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                            contentDescription = null, tint = accent, modifier = Modifier.size(28.dp))
+                                            contentDescription = null, tint = p.accent, modifier = Modifier.size(28.dp))
                                     }
                                 }
                                 Spacer(Modifier.height(8.dp))
-                                Text(audioFile.fileName, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = textPrimary)
+                                Text(audioFile.fileName, fontSize = (14.sp * appliedScale), fontWeight = FontWeight.SemiBold, color = p.textPrimary)
                                 Spacer(Modifier.height(4.dp))
-                                Text("Duração: ${(audioFile.audioDuration / 1000)}s", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = accent)
+                                Text("Duração: ${(audioFile.audioDuration / 1000)}s", fontSize = (15.sp * appliedScale), fontWeight = FontWeight.Bold, color = p.accent)
                             }
                         }
                         if (idx < report.files.size - 1) Spacer(Modifier.height(8.dp))
@@ -306,17 +305,17 @@ fun AudioReportDetailDialog(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(cardColor)
+                                    .background(p.surface)
                                     .padding(12.dp)
                             ) {
                                 if (attempt.phrase.isNotEmpty()) {
-                                    Text("Esperado:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = textSecondary)
-                                    Text(attempt.phrase, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = textPrimary)
+                                    Text("Esperado:", fontSize = (12.sp * appliedScale), fontWeight = FontWeight.Bold, color = p.textSecondary)
+                                    Text(attempt.phrase, fontSize = (14.sp * appliedScale), fontWeight = FontWeight.SemiBold, color = p.textPrimary)
                                     Spacer(Modifier.height(8.dp))
                                 }
                                 if (attempt.transcribed.isNotEmpty()) {
-                                    Text("Transcrito:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = textSecondary)
-                                    Text(attempt.transcribed, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = accent)
+                                    Text("Transcrito:", fontSize = (12.sp * appliedScale), fontWeight = FontWeight.Bold, color = p.textSecondary)
+                                    Text(attempt.transcribed, fontSize = (14.sp * appliedScale), fontWeight = FontWeight.SemiBold, color = p.accent)
                                 }
                             }
                             Spacer(Modifier.height(8.dp))
@@ -324,21 +323,21 @@ fun AudioReportDetailDialog(
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Duração", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = textSecondary)
-                                Text("${audioFile.audioDuration / 1000}s", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = accent)
+                                Text("Duração", fontSize = (12.sp * appliedScale), fontWeight = FontWeight.SemiBold, color = p.textSecondary)
+                                Text("${audioFile.audioDuration / 1000}s", fontSize = (14.sp * appliedScale), fontWeight = FontWeight.Bold, color = p.accent)
                             }
                             if (attempt != null) {
                                 when (chartType) {
                                     ChartType.WPM -> {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text("WPM", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = textSecondary)
-                                            Text("${attempt.wpm}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = accent)
+                                            Text("WPM", fontSize = (12.sp * appliedScale), fontWeight = FontWeight.SemiBold, color = p.textSecondary)
+                                            Text("${attempt.wpm}", fontSize = (14.sp * appliedScale), fontWeight = FontWeight.Bold, color = p.accent)
                                         }
                                     }
                                     ChartType.WER -> {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text("WER", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = textSecondary)
-                                            Text("${String.format("%.1f", attempt.wer)}%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = accent)
+                                            Text("WER", fontSize = (12.sp * appliedScale), fontWeight = FontWeight.SemiBold, color = p.textSecondary)
+                                            Text("${String.format("%.1f", attempt.wer)}%", fontSize = (14.sp * appliedScale), fontWeight = FontWeight.Bold, color = p.accent)
                                         }
                                     }
                                 }
@@ -357,11 +356,11 @@ fun AudioReportDetailDialog(
                         currentlyPlayingIndex = null
                         onDismiss()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = if (isHC) Color.Black else Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = p.accent, contentColor = p.accent.on),
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(16.dp)
                 ) {
-                    Text("Fechar", color = if (isHC) Color.Black else Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Fechar", color = p.accent.on, fontSize = (16.sp * appliedScale), fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -374,8 +373,6 @@ private fun SimpleWaveform(modifier: Modifier = Modifier) {
     LaunchedEffect(Unit) { while (true) { delay(50); phase += 0.3f } }
 
     val p = LocalReportsPalette.current
-    val isHC = p.textPrimary.luma() > 0.8f
-    val accent = if (isHC) HighContrastAccent else GreenDark
 
     Canvas(modifier = modifier) {
         val w = size.width
@@ -389,7 +386,7 @@ private fun SimpleWaveform(modifier: Modifier = Modifier) {
             val offset = (i * 0.5f + phase) % 6.28f
             val barHeight = amplitude * sin(offset) * 0.5f + amplitude * 0.5f
             drawRect(
-                color = accent,
+                color = p.accent,
                 topLeft = Offset(x + barWidth * 0.2f, centerY - barHeight / 2),
                 size = Size(barWidth * 0.6f, barHeight)
             )

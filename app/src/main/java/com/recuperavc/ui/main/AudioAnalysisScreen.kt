@@ -1,5 +1,10 @@
 package com.recuperavc.ui.main
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -19,7 +24,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.TrendingUp
@@ -46,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.BackHandler
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
@@ -64,6 +71,7 @@ import com.recuperavc.ui.theme.OnSurface
 import com.recuperavc.ui.util.InitialSettings
 import com.recuperavc.ui.util.PaintSystemBars
 import com.recuperavc.ui.util.rememberInitialSettings
+import com.recuperavc.ui.components.*
 import kotlinx.coroutines.flow.collectLatest
 
 private val HighContrastAccent = Color(0xFFFFD600)
@@ -111,6 +119,11 @@ fun AudioAnalysisScreen(
     )
 
     var showEndDialog by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = true) {
+        sfx.play(Sfx.CLICK)
+        showEndDialog = true
+    }
 
     AudioAnalysisContent(
         canTranscribe = viewModel.canTranscribe,
@@ -378,6 +391,68 @@ private fun AudioAnalysisContent(
                     )
                 }
 
+                val chipContainer = when {
+                    appliedContrast -> Color.Black
+                    appliedDark -> Color(0xFF2A2A2A)
+                    else -> Color.White.copy(alpha = 0.96f)
+                }
+                val chipLabel = when {
+                    appliedContrast -> Color.White
+                    appliedDark -> Color(0xFFEDEDED)
+                    else -> Color(0xFF1B1B1B)
+                }
+                val chipBorder = when {
+                    appliedContrast -> BorderStroke(1.dp, accent.copy(alpha = 0.7f))
+                    appliedDark -> BorderStroke(1.dp, Color.White.copy(alpha = 0.10f))
+                    else -> null
+                }
+                val chipIconBg = when {
+                    appliedContrast -> accent
+                    appliedDark -> GreenDark
+                    else -> GreenDark
+                }
+                val chipIconTint = if (appliedContrast) Color.Black else Color.White
+                AnimatedVisibility(
+                    visible = isRecording && !isProcessing && !isCancelling,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Card(
+                        shape = RoundedCornerShape(50),
+                        colors = CardDefaults.cardColors(containerColor = chipContainer),
+                        elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 3.dp),
+                        border = chipBorder,
+                        modifier = Modifier.padding(top = 12.dp, bottom = 12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clip(CircleShape)
+                                    .background(chipIconBg),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Info,
+                                    contentDescription = null,
+                                    tint = chipIconTint,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "Toque no botão grande novamente para enviar agora",
+                                fontSize = 14.sp * appliedScale,
+                                color = chipLabel
+                            )
+                        }
+                    }
+                }
+
                 Text(
                     text = phraseText,
                     fontSize = 24.sp * appliedScale,
@@ -418,14 +493,14 @@ private fun AudioAnalysisContent(
                                 contentColor = Color.White
                             ),
                             modifier = Modifier
-                                .size(56.dp)
+                                .size(64.dp)
                                 .align(Alignment.CenterHorizontally),
                             shape = CircleShape
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Cancel,
+                                imageVector = Icons.Default.Close,
                                 contentDescription = "Cancelar gravação",
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(36.dp)
                             )
                         }
                     }
@@ -579,19 +654,40 @@ private fun MetricCard(
     color: Color,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     appliedContrast: Boolean,
-    appliedScale: Float
+    appliedScale: Float,
+    appliedDark: Boolean = false
 ) {
-    val container = if (appliedContrast) Color.Black else Color.White.copy(alpha = 0.95f)
-    val border = if (appliedContrast) BorderStroke(2.dp, color) else null
-    val titleColor = if (appliedContrast) Color.White.copy(alpha = 0.8f) else Color.Gray.copy(alpha = 0.8f)
-    val valueColor = if (appliedContrast) Color.White else color
-    val unitColor = if (appliedContrast) Color.White.copy(alpha = 0.7f) else color.copy(alpha = 0.7f)
+    val container = when {
+        appliedContrast -> Color.Black
+        appliedDark -> Color(0xFF2A2A2A)
+        else -> Color.White.copy(alpha = 0.95f)
+    }
+    val border = when {
+        appliedContrast -> BorderStroke(2.dp, color)
+        appliedDark -> BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+        else -> null
+    }
+    val titleColor = when {
+        appliedContrast -> Color.White.copy(alpha = 0.8f)
+        appliedDark -> Color(0xFFCCCCCC)
+        else -> Color.Gray.copy(alpha = 0.8f)
+    }
+    val valueColor = when {
+        appliedContrast -> Color.White
+        appliedDark -> Color.White
+        else -> color
+    }
+    val unitColor = when {
+        appliedContrast -> Color.White.copy(alpha = 0.7f)
+        appliedDark -> Color(0xFFCCCCCC)
+        else -> color.copy(alpha = 0.7f)
+    }
 
     Card(
         modifier = Modifier.width(140.dp),
         colors = CardDefaults.cardColors(containerColor = container),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast) 0.dp else 8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 8.dp),
         border = border
     ) {
         Column(
@@ -623,6 +719,37 @@ private fun SessionSummaryScreen(
     onClose: () -> Unit,
     onNavigateHome: () -> Unit
 ) {
+    val cardContainer = when {
+        appliedContrast -> Color.Black
+        appliedDark -> Color(0xFF1E1E1E)
+        else -> Color.White
+    }
+    val titleColor = when {
+        appliedContrast -> accent
+        appliedDark -> Color.White
+        else -> Color(0xFF1B1B1B)
+    }
+    val labelColor = when {
+        appliedContrast -> Color.White
+        appliedDark -> Color(0xFFEDEDED)
+        else -> Color(0xFF3A3A3A)
+    }
+    val itemCardContainer = when {
+        appliedContrast -> Color.Black
+        appliedDark -> Color(0xFF2A2A2A)
+        else -> Color(0xFFF5F5F5)
+    }
+    val itemTextColor = when {
+        appliedContrast -> Color.White
+        appliedDark -> Color(0xFFEDEDED)
+        else -> Color(0xFF1B1B1B)
+    }
+    val cardBorder = when {
+        appliedContrast -> BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+        appliedDark -> BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+        else -> null
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -634,8 +761,9 @@ private fun SessionSummaryScreen(
                 .padding(20.dp)
                 .align(Alignment.Center),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = if (appliedContrast) Color.Black else Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast) 0.dp else 6.dp)
+            colors = CardDefaults.cardColors(containerColor = cardContainer),
+            elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 6.dp),
+            border = cardBorder
         ) {
             Column(
                 modifier = Modifier
@@ -648,7 +776,7 @@ private fun SessionSummaryScreen(
                     "Relatório do Teste",
                     fontSize = 22.sp * appliedScale,
                     fontWeight = FontWeight.Bold,
-                    color = if (appliedContrast) accent else textPrimary
+                    color = titleColor
                 )
                 Spacer(Modifier.height(16.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -659,7 +787,8 @@ private fun SessionSummaryScreen(
                         color = accent,
                         icon = Icons.Default.Speed,
                         appliedContrast = appliedContrast,
-                        appliedScale = appliedScale
+                        appliedScale = appliedScale,
+                        appliedDark = appliedDark
                     )
                     MetricCard(
                         title = "Precisão média",
@@ -668,26 +797,25 @@ private fun SessionSummaryScreen(
                         color = accent,
                         icon = Icons.Default.TrendingUp,
                         appliedContrast = appliedContrast,
-                        appliedScale = appliedScale
+                        appliedScale = appliedScale,
+                        appliedDark = appliedDark
                     )
                 }
                 Spacer(Modifier.height(16.dp))
-                Text("Tentativas", fontWeight = FontWeight.SemiBold, color = textPrimary)
+                Text("Tentativas", fontWeight = FontWeight.SemiBold, color = labelColor)
                 Spacer(Modifier.height(8.dp))
                 summary.items.forEachIndexed { idx, item ->
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (appliedContrast) Color.Black else Color.White.copy(alpha = 0.95f)
-                        ),
+                        colors = CardDefaults.cardColors(containerColor = itemCardContainer),
                         shape = RoundedCornerShape(12.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast) 0.dp else 1.dp),
-                        border = if (appliedContrast) BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)) else null
+                        elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 1.dp),
+                        border = if (appliedContrast) BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)) else if (appliedDark) BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)) else null
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Text("${idx + 1}. ${item.phrase}", fontWeight = FontWeight.Medium, color = textPrimary)
+                            Text("${idx + 1}. ${item.phrase}", fontWeight = FontWeight.Medium, color = itemTextColor)
                             Spacer(Modifier.height(6.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                                 Text("WPM: ${item.wpm}", color = accent)

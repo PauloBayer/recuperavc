@@ -193,7 +193,9 @@ fun CoherenceReportDetailDialog(
 
                 Spacer(Modifier.height(20.dp))
 
-                val sr = if (groups.isNotEmpty()) groups.count { it.tries.firstOrNull()?.correct == true }.toFloat() / groups.size.toFloat() else 0f
+                val totalTries = groups.sumOf { it.tries.size }
+                val correctTries = groups.sumOf { it.tries.count { t -> t.correct } }
+                val sr = if (totalTries > 0) correctTries.toFloat() / totalTries.toFloat() else 0f
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
