@@ -211,8 +211,14 @@ fun CoherenceReportDetailDialog(
                         }
                         Spacer(Modifier.height(8.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            StatsBox(modifier = Modifier.weight(1f), label = "Tempo Médio", value = "${String.format("%.1f", report.averageTimePerTry)}s", icon = Icons.Default.Timer)
-                            StatsBox(modifier = Modifier.weight(1f), label = "Tentativas Médias", value = String.format("%.1f", report.averageErrorsPerTry), icon = Icons.Default.RepeatOne)
+                            when (chartType) {
+                                CoherenceChartType.TIME -> {
+                                    StatsBox(modifier = Modifier.weight(1f), label = "Tempo Médio", value = "${String.format("%.1f", report.averageTimePerTry)}s", icon = Icons.Default.Timer)
+                                }
+                                CoherenceChartType.ERRORS -> {
+                                    StatsBox(modifier = Modifier.weight(1f), label = "Tentativas Médias", value = String.format("%.1f", report.averageErrorsPerTry), icon = Icons.Default.RepeatOne)
+                                }
+                            }
                         }
                     }
                 }
@@ -269,8 +275,14 @@ fun CoherenceReportDetailDialog(
 
                             Spacer(Modifier.height(12.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                InfoCard(modifier = Modifier.weight(1f), label = "Tentativas", value = "${g.triesCount}")
-                                InfoCard(modifier = Modifier.weight(1f), label = "Tempo", value = "${String.format("%.1f", g.timeUntilCorrectMs / 1000f)}s")
+                                when (chartType) {
+                                    CoherenceChartType.TIME -> {
+                                        InfoCard(modifier = Modifier.weight(1f), label = "Tempo", value = "${String.format("%.1f", g.timeUntilCorrectMs / 1000f)}s")
+                                    }
+                                    CoherenceChartType.ERRORS -> {
+                                        InfoCard(modifier = Modifier.weight(1f), label = "Tentativas", value = "${g.triesCount}")
+                                    }
+                                }
                             }
 
                             if (g.tries.isNotEmpty()) {
