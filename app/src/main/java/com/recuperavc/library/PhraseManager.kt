@@ -33,7 +33,7 @@ class PhraseManager(private val context: Context) {
             val allOfType = dao.getByType(type)
             if (allOfType.isEmpty()) {
                 null
-            } else {;
+            } else {
                 val available = allOfType.filter { isPhraseOutOfCooldown(it.description) }
                 val pool = if (available.isNotEmpty()) {
                     val filtered = available.filter { it.description != lastUsedPhrase }
