@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.TrendingUp
+import com.recuperavc.R
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -800,6 +801,125 @@ private fun SessionSummaryScreen(
                         appliedScale = appliedScale,
                         appliedDark = appliedDark
                     )
+                }
+                Spacer(Modifier.height(16.dp))
+                val ctx = LocalContext.current
+                val brWpm = kotlin.runCatching { ctx.getString(R.string.br_avg_wpm).replace(",", ".").toDouble() }.getOrElse { 150.0 }
+                val brWer = kotlin.runCatching { ctx.getString(R.string.br_avg_wer).replace(",", ".").toDouble() }.getOrElse { 12.0 }
+                val wpmUser = summary.avgWpm.toDouble()
+                val werUser = summary.avgWer.toDouble()
+                val goodColor = if (appliedContrast) accent else Color(0xFF2E7D32)
+                val badColor = if (appliedContrast) Color(0xFFFF8A80) else Color(0xFFD32F2F)
+                val goodBg = if (appliedContrast) accent.copy(alpha = 0.2f) else goodColor.copy(alpha = 0.15f)
+                val badBg = badColor.copy(alpha = 0.15f)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = itemCardContainer),
+                    shape = RoundedCornerShape(14.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 1.dp),
+                    border = if (appliedContrast) BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)) else if (appliedDark) BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)) else null
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
+                        Text("Referência (PT-BR)", fontWeight = FontWeight.SemiBold, color = labelColor, fontSize = 14.sp * appliedScale)
+                        Spacer(Modifier.height(10.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("WPM", fontWeight = FontWeight.Medium, color = itemTextColor, fontSize = 12.sp * appliedScale)
+                                Spacer(Modifier.height(6.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("BR: ${String.format("%.0f", brWpm)}", color = labelColor, fontSize = 12.sp * appliedScale)
+                                    Text("Você: ${String.format("%.0f", wpmUser)}", color = accent, fontSize = 12.sp * appliedScale)
+                                }
+                                Spacer(Modifier.height(6.dp))
+                                val wpmAbove = wpmUser >= brWpm
+                                val wpmDiffPct = if (brWpm > 0) ((wpmUser - brWpm) / brWpm * 100.0) else 0.0
+                                Card(
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = if (wpmAbove) goodBg else badBg)
+                                ) {
+                                    Text(
+                                        text = if (wpmAbove) "Acima da média (+${String.format("%.0f", wpmDiffPct)}%)" else "Abaixo da média (${String.format("%.0f", wpmDiffPct)}%)",
+                                        color = if (wpmAbove) goodColor else badColor,
+                                        fontSize = 12.sp * appliedScale,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("WER", fontWeight = FontWeight.Medium, color = itemTextColor, fontSize = 12.sp * appliedScale)
+                                Spacer(Modifier.height(6.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("BR: ${String.format("%.1f", brWer)}%", color = labelColor, fontSize = 12.sp * appliedScale)
+                                    Text("Você: ${String.format("%.1f", werUser)}%", color = accent, fontSize = 12.sp * appliedScale)
+                                }
+                                Spacer(Modifier.height(6.dp))
+                                val werBetter = werUser <= brWer
+                                val werDiffPct = if (brWer > 0) ((brWer - werUser) / brWer * 100.0) else 0.0
+                                Card(
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = if (werBetter) goodBg else badBg)
+                                ) {
+                                    Text(
+                                        text = if (werBetter) "Melhor que a média (+${String.format("%.0f", werDiffPct)}%)" else "Pior que a média (${String.format("%.0f", -werDiffPct)}%)",
+                                        color = if (werBetter) goodColor else badColor,
+                                        fontSize = 12.sp * appliedScale,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                val wpmAbove = wpmUser >= brWpm * 1.1
+                val wpmBelow = wpmUser <= brWpm * 0.9
+                val werBetter = werUser <= brWer * 1.0
+                val werMuchBetter = werUser <= brWer * 0.9
+                val werWorse = werUser >= brWer * 1.1
+                val headline: String
+                val body: String
+                when {
+                    wpmAbove && (werMuchBetter || werBetter) -> {
+                        headline = "Ótimo ritmo"
+                        body = "Sua velocidade está acima da referência com boa precisão. Mantenha a prática regular e avance para frases mais longas quando se sentir confortável."
+                    }
+                    wpmBelow && (werMuchBetter || werBetter) -> {
+                        headline = "Base sólida"
+                        body = "Boa precisão. Agora, aumente a velocidade gradualmente: repita a frase, respire fundo e tente manter um ritmo contínuo."
+                    }
+                    wpmAbove && werWorse -> {
+                        headline = "Ajuste fino"
+                        body = "Velocidade alta, mas com mais erros. Diminua um pouco o ritmo e articule cada palavra com calma para melhorar a precisão."
+                    }
+                    wpmBelow && werWorse -> {
+                        headline = "Seguimos juntos"
+                        body = "É normal oscilar. Comece com frases curtas, foque em respirar e pronunciar com clareza. A velocidade vem com a prática."
+                    }
+                    else -> {
+                        headline = "Bom caminho"
+                        body = "Você está próximo da referência. Continue praticando e ajuste suavemente ritmo e articulação para evoluir."
+                    }
+                }
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = itemCardContainer),
+                    shape = RoundedCornerShape(14.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 1.dp),
+                    border = if (appliedContrast) BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)) else if (appliedDark) BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)) else null
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
+                        Text(headline, fontWeight = FontWeight.Bold, color = accent, fontSize = 16.sp * appliedScale)
+                        Spacer(Modifier.height(6.dp))
+                        Text(body, color = itemTextColor, fontSize = 14.sp * appliedScale)
+                        Spacer(Modifier.height(8.dp))
+                        Text("Dicas rápidas", fontWeight = FontWeight.SemiBold, color = labelColor, fontSize = 12.sp * appliedScale)
+                        Spacer(Modifier.height(4.dp))
+                        Text("• Respiração tranquila antes de falar", color = itemTextColor, fontSize = 12.sp * appliedScale)
+                        Text("• Articule sílabas com clareza", color = itemTextColor, fontSize = 12.sp * appliedScale)
+                        Text("• Comece devagar e aumente o ritmo aos poucos", color = itemTextColor, fontSize = 12.sp * appliedScale)
+                    }
                 }
                 Spacer(Modifier.height(16.dp))
                 Text("Tentativas", fontWeight = FontWeight.SemiBold, color = labelColor)

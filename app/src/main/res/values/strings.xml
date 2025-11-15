@@ -10,4 +10,6 @@
     <string name="assessment_normal">Progresso excelente - Fala bem desenvolvida</string>
     <string name="assessment_attention">Progresso consistente - Continue os exercícios</string>
     <string name="assessment_concern">Mantenha regularidade nos exercícios de reabilitação</string>
+    <string name="br_avg_wpm">90</string>
+    <string name="br_avg_wer">12</string>
 </resources>
