@@ -208,7 +208,7 @@ private class WhisperLib {
             } else if (loadV8fp16 && tryLoad("whisper_v8fp16_va")) {
                 System.loadLibrary("whisper_v8fp16_va")
             } else if (tryLoad("whisper_v8fp16")) {
-                System.loadLibrary("whisper_v8fp16_va")
+                System.loadLibrary("whisper_v8fp16")
             } else {
                 System.loadLibrary("whisper")
             }

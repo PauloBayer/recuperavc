@@ -203,7 +203,11 @@ fun HomeScreen(
             }
         }
     ) {
-        Box(modifier = Modifier.fillMaxSize().background(background)) {
+        Box(modifier = Modifier
+                        .fillMaxSize()
+                        .background(background)
+                        .systemBarsPadding()
+        ) {
 
             // Top header with wave (decorative; hide in HC)
             Box(modifier = Modifier.fillMaxWidth().height(120.dp)) {

@@ -1,243 +1,88 @@
 # Para rodar o projeto:
 
-O modelo do Whispper não vem junto com o repositório, pois ele é muito pesado. Ele precisa ser baixado a parte de depois colocado em certa pasta. Siga os passos:
+O modelo do Whispper não vem junto com o repositório, pois ele é muito pesado. Ele precisa ser baixado a parte de depois colocado na pasta correta. Siga os passos:
 
 1. Baixe o modelo aqui: https://drive.google.com/file/d/1kajwLNlkBH-_FD3Y5vSH-R8N05lPmUuG/view?usp=sharing
 2. Coloque na pasta: recuperavc\app\src\main\assets\models
 
+# RecuperAVC – Sistema para Apoio à Recuperação Pós‑AVC
 
-# AnalisAVC - Detector de AVC por Análise de Fala
+RecuperAVC é um aplicativo móvel de **reabilitação pós‑AVC** destinado a pacientes, cuidadores e profissionais de saúde.  O sistema integra múltiplos testes que avaliam fala, compreensão de linguagem e motricidade fina, registra métricas de desempenho, mantém histórico local e gera relatórios que podem ser compartilhados com a equipe de reabilitação.  O projeto foi desenvolvido como Trabalho de Conclusão de Curso na Universidade Federal do Paraná e foi pensado para ampliar o acesso a práticas de reabilitação e permitir o acompanhamento contínuo da evolução do paciente.  Todo o processamento ocorre no dispositivo, sem depender de servidores externos, e o código‑fonte completo está disponível neste repositório.
 
-![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
-![Kotlin](https://img.shields.io/badge/kotlin-%237F52FF.svg?style=for-the-badge&logo=kotlin&logoColor=white)
-![AI](https://img.shields.io/badge/AI-Whisper.cpp-blue?style=for-the-badge)
+## Funcionalidades principais
 
-Um aplicativo Android que utiliza Inteligência Artificial para detectar possíveis sinais de AVC (Acidente Vascular Cerebral) através da análise da fala do usuário.
+### Teste de fala
 
-## 🧠 Como Funciona
+* O usuário lê em voz alta uma frase apresentada na tela.  O áudio é gravado e **transcrito localmente** pelo modelo _Whisper.cpp_, uma versão otimizada do OpenAI Whisper para dispositivos móveis.
+* As métricas calculadas incluem **Palavras por Minuto (WPM)** e **Taxa de Erro de Palavras (WER)**.  Estas métricas são armazenadas no banco de dados embarcado e exibidas em relatórios, permitindo o acompanhamento de tendências ao longo das sessões.
+* Para cada sessão são gerados relatórios detalhados (para análise clínica) e relatórios simplificados que indicam se o usuário está dentro, acima ou abaixo da média populacional.
 
-O aplicativo utiliza o modelo **Whisper.cpp** (versão otimizada do OpenAI Whisper para dispositivos móveis) para:
+### Teste de arranjo de frases
 
-1. **Capturar áudio** da fala do usuário
-2. **Transcrever** o áudio para texto usando IA
-3. **Analisar** métricas de fala (WPM e WER)
-4. **Classificar** o risco baseado nos resultados
+* Inspirado em paradigmas de avaliação linguística, este módulo apresenta as palavras de uma frase em ordem aleatória e solicita ao usuário que reordene os termos de forma coesa.
+* O sistema mede o **tempo gasto**, o **número de erros por tentativa** e a **consistência das soluções**, compondo um **índice de coerência sintático‑semântica** ao longo do tempo.
 
-### 📊 Métricas Analisadas
+### Teste de motricidade fina (finger tapping)
 
-#### **WPM (Words Per Minute) - Palavras por Minuto**
-- 🟢 **Normal**: ≥ 120 WPM (fala fluente)
-- 🟡 **Atenção**: 60-119 WPM (fala lenta)
-- 🔴 **Preocupante**: < 60 WPM (fala muito lenta)
+* Avalia coordenação motora e velocidade de toques usando um botão alvo.
+* Dois modos estão disponíveis: **modo com movimento**, no qual o botão se reposiciona aleatoriamente a cada acerto, e **modo sem movimento**, em que o botão permanece fixo no centro.
+* O usuário informa a mão utilizada (direita/esquerda) e se ela é a mão dominante.  A duração padrão é de 30 s para o modo com movimento e 20 s para o modo fixo.
+* O relatório registra métricas como **cliques por minuto**, **total de cliques**, **missed clicks** (toques fora do alvo) e indicações da mão utilizada e do modo de movimento.
 
-#### **WER (Word Error Rate) - Taxa de Erro de Palavras**
-- 🟢 **Normal**: ≤ 10% (alta precisão)
-- 🟡 **Atenção**: 11-20% (alterações leves)
-- 🔴 **Preocupante**: > 20% (alterações significativas)
+### Acessibilidade e personalização
 
-### ⚕️ Classificação de Risco
+O aplicativo foi projetado para usuários com sequelas motoras, visuais ou cognitivas.  Além de fluxos curtos e previsíveis, o **RecuperAVC** oferece:
 
-| WER | WPM | Resultado | Cor |
-|-----|-----|-----------|-----|
-| ≤ 10% | ≥ 120 | Normal - Fala dentro do esperado | 🟢 Verde |
-| ≤ 20% | ≥ 60 | Atenção - Possível alteração na fala | 🟡 Laranja |
-| > 20% | < 60 | Preocupante - Procure ajuda médica | 🔴 Vermelho |
+* Ajuste do **tamanho da fonte** em toda a aplicação para melhorar a legibilidade.
+* Alternância entre **modo claro**, **modo escuro** e **modo de alto contraste**, com paletas de cores adaptadas para pessoas com baixa visão.
+* **Alvos de toque ampliados** e textos sucintos para reduzir a carga motora e cognitiva.
+* **Efeitos sonoros** opcionais que auxiliam usuários com deficiência visual.
 
-## 🎯 Frase de Teste
+### Persistência de dados e relatórios
 
-O aplicativo utiliza a frase padronizada:
-> **"O rato roeu a roupa do rei de Roma"**
+* Os resultados de cada teste são armazenados localmente usando **Android Room** (SQLite) com consultas tipadas, garantindo privacidade e uso offline.
+* As informações são agrupadas em relatórios por sessão e por tipo de teste.  O módulo de relatórios permite filtrar por data, visualizar o histórico de evolução e **exportar relatórios em PDF** para compartilhamento com profissionais de saúde.
 
-Esta frase foi escolhida por conter:
-- **Diversidade fonética**: Sons variados (R, L, vogais)
-- **Dificuldade articulatória**: Aliterações e sons complexos
-- **Padrão conhecido**: Amplamente utilizada em testes de fala
+### Arquitetura técnica
 
-## 🛠️ Arquitetura Técnica
+* **Linguagem e UI:** o aplicativo utiliza **Kotlin** com **Jetpack Compose** em uma arquitetura **MVVM**.  Os estados da interface são gerenciados por _ViewModels_ e fluxos reativos, permitindo transições suaves e desacoplamento entre UI e lógica de negócios.
+* **Persistência:** implementação da biblioteca **Android Room** com _DAOs_ para cada entidade (`AudioReportDao`, `CoherenceReportDao`, `MotionReportDao`, etc.).
+* **Biblioteca de fala:** integração com **Whisper.cpp**, compilada como biblioteca nativa no módulo `lib/`.  O modelo é carregado dos assets e processa os dados de áudio no próprio dispositivo.
+* **Ajustes de sistema:** a classe `SettingsViewModel` armazena preferências do usuário (tema, contraste, tamanho de texto).  A função `PaintSystemBars` aplica as cores da barra de status e navegação de acordo com o tema selecionado.
 
-### **Manipulação do Whisper.cpp**
+## Instalação
 
-#### 1. **Carregamento do Modelo**
-```kotlin
-// Carrega modelo IA dos assets
-whisperContext = WhisperContext.createContextFromAsset(
-    application.assets, 
-    "models/${modelFile}"
-)
-```
+1. **Clone o repositório** ou baixe o ZIP deste projeto.
+2. **Baixe o modelo Whisper**: o arquivo de modelo não é versionado por ser volumoso.  Obtenha o modelo no [Google Drive](https://drive.google.com/file/d/1kajwLNlkBH-_FD3Y5vSH-R8N05lPmUuG/view?usp=sharing) e copie para `app/src/main/assets/models`.
+3. **Abra o projeto no Android Studio** (Arctic Fox ou superior), aguarde a sincronização do Gradle e conecte um dispositivo Android ou emulador.
+4. **Compile e execute** a aplicação.  Na primeira execução o aplicativo solicitará permissão para gravar áudio.  Permita o acesso para realizar o teste de fala.
 
-#### 2. **Processamento de Áudio**
-```kotlin
-// Decodifica áudio WAV para FloatArray
-val audioData = decodeWaveFile(recordedFile)
+## Utilização
 
-// Transcreve usando Whisper
-val rawText = whisperContext?.transcribeData(audioData)
-```
+### Navegação
 
-#### 3. **Limpeza de Dados**
-```kotlin
-// Remove timestamps: [000000000 --> 000004000]
-val cleanText = rawText.replace("\\[.*?\\]".toRegex(), "")
-    .replace(":", "")
-    .replace("\\s+".toRegex(), " ")
-    .trim()
-```
+Ao abrir o RecuperAVC você encontrará a **tela inicial**, onde poderá escolher:
 
-#### 4. **Cálculo de Métricas**
+* **Teste de Fala** – avalia velocidade e precisão na leitura de uma frase.
+* **Arranjo de Frases** – mede compreensão sintático‑semântica reordenando palavras embaralhadas.
+* **Teste de Motricidade Fina** – avalia rapidez e coordenação dos toques.
+* **Relatórios** – permite visualizar o histórico de resultados e exportar relatórios em PDF.
+* **Preferências** – ajuste de tema, contraste, tamanho de texto e sons.
 
-**WPM (Words Per Minute):**
-```kotlin
-val recordingDurationMinutes = recordingDurationMs / 60000.0
-val wpm = (transcribedWords.size / recordingDurationMinutes).toInt()
-```
+### Métricas de avaliação
 
-**WER (Word Error Rate) - Algoritmo de Distância de Edição:**
-```kotlin
-// Matriz de programação dinâmica para calcular distância Levenshtein
-val dp = Array(expected.size + 1) { IntArray(transcribed.size + 1) }
+| Teste | Métricas principais (descrições curtas) |
+|------|-----------------------------------------|
+| **Fala** | **WPM**: Palavras por minuto; **WER**: Taxa de erro de palavras |
+| **Arranjo de Frases** | Tempo total de arranjo; erros por tentativa; índice de coerência |
+| **Motricidade Fina** | Cliques por minuto (CPM); total de cliques; número de toques fora do alvo |
 
-// Calcula custo mínimo de transformação
-val editDistance = dp[expected.size][transcribed.size]
-val wer = (editDistance.toDouble() / expected.size) * 100
-```
+#### Classificação de WPM e WER
 
-### **Estados da Interface**
+| WER | WPM | Interpretação | Cor |
+|-----|-----|--------------|----|
+| ≤ 10 % | ≥ 120 | Fala dentro do esperado | 🟢 Normal |
+| ≤ 20 % | ≥ 60  | Possível alteração leve | 🟠 Atenção |
+| > 20 % | < 60  | Procure avaliação médica | 🔴 Preocupante |
 
-#### 1. **Loading State**
-- Carregamento inicial do modelo Whisper
-- Indicador circular com texto "Carregando modelo de IA..."
-
-#### 2. **Ready State**
-- Botão verde de gravação 🎤
-- Frase de teste exibida
-- Interface pronta para uso
-
-#### 3. **Recording State**
-- Botão vermelho de parar ⏹
-- Captura de áudio ativa
-
-#### 4. **Processing State**
-- Botão cinza desabilitado ⏳
-- Indicador "Processando áudio..."
-- Transcrição e análise em execução
-
-#### 5. **Results State**
-- Texto transcrito exibido
-- Métricas WPM/WER com cores
-- Classificação de risco
-
-## ⚡ **Otimizações de Performance**
-
-### **1. Threading Inteligente**
-```kotlin
-// Algoritmo adaptativo de threads baseado no dispositivo
-val optimalThreads = when {
-    totalCores >= 8 -> (totalCores * 0.75).toInt()  // Flagships: 75% dos cores
-    totalCores >= 4 -> (highPerfCores + 2)          // Mid-range: High-perf + 2
-    else -> totalCores.coerceAtLeast(2)             // Low-end: Todos os cores
-}
-```
-
-**Resultado**: **30-50% mais rápido** em dispositivos modernos
-
-### **2. Priority Boost**
-```kotlin
-// Boost de prioridade durante processamento
-Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
-```
-
-**Resultado**: **20-30% melhoria** na responsividade
-
-### **3. Dispatcher Otimizado**
-```kotlin
-// Dispatcher com paralelismo limitado aos cores disponíveis
-val highPerformanceDispatcher = Dispatchers.Default.limitedParallelism(
-    Runtime.getRuntime().availableProcessors().coerceAtLeast(4)
-)
-```
-
-**Resultado**: **15-25% redução** no tempo de processamento
-
-### **4. Detecção de CPU Avançada**
-- **Detecção automática** de cores high-performance
-- **Análise de frequências** de CPU
-- **Otimização específica** por arquitetura (ARM v7a/v8a)
-- **Bibliotecas otimizadas** (vfpv4, fp16_va)
-
-### **📊 Benchmarks de Performance**
-
-| Dispositivo | Cores | Threads Antigo | Threads Novo | Melhoria |
-|-------------|-------|----------------|--------------|----------|
-| Flagship (8+ cores) | 8 | 2 | 6 | **3x mais rápido** |
-| Mid-range (6 cores) | 6 | 2 | 4 | **2x mais rápido** |
-| Entry-level (4 cores) | 4 | 2 | 4 | **2x mais rápido** |
-
-### **🎯 Resultados Esperados**
-- **Processamento 2-3x mais rápido**
-- **Menor uso de bateria** (processamento mais eficiente)
-- **Interface mais responsiva**
-- **Aproveitamento máximo do hardware**
-
-## 🔧 Tecnologias Utilizadas
-
-- **Linguagem**: Kotlin
-- **UI Framework**: Jetpack Compose
-- **IA Engine**: Whisper.cpp (OpenAI Whisper otimizado)
-- **Audio Processing**: Android MediaRecorder + WAV decoder
-- **Architecture**: MVVM + Coroutines
-- **State Management**: Compose State
-- **Performance**: Multi-threading + Priority Boost + CPU Optimization
-
-## 📱 Funcionalidades
-
-### ✅ **Implementadas**
-- [x] Carregamento automático do modelo Whisper
-- [x] Gravação de áudio com permissões
-- [x] Transcrição speech-to-text
-- [x] Cálculo preciso de WPM e WER
-- [x] Interface responsiva com estados visuais
-- [x] Classificação automática de risco
-- [x] Design médico (cores verde/branco)
-- [x] Indicadores de carregamento e processamento
-- [x] Botão inteligente (desabilitado durante processamento)
-- [x] **Otimizações de Performance para Processamento Rápido**
-
-### 🔄 **Estados do Botão**
-- 🟢 **Verde + 🎤**: Pronto para gravar
-- 🔴 **Vermelho + ⏹**: Gravando
-- ⚫ **Cinza + ⏳**: Processando (desabilitado)
-
-## ⚠️ **Aviso Médico**
-
-⚠️ **IMPORTANTE**: Este aplicativo é uma ferramenta de **triagem inicial** e **NÃO substitui** diagnóstico médico profissional.
-
-- ✅ **Use para**: Monitoramento pessoal e detecção precoce
-- ❌ **Não use como**: Diagnóstico definitivo ou substituição médica
-- 🏥 **Sempre consulte** um profissional de saúde em caso de alterações
-
-## 🚀 **Como Executar**
-
-1. Clone o repositório
-2. Abra no Android Studio
-3. Conecte um dispositivo Android ou use emulador
-4. Execute o projeto
-5. Permita acesso ao microfone
-6. Aguarde o carregamento do modelo IA
-7. Teste com a frase padrão
-
-## 📝 **Histórico de Desenvolvimento**
-
-Este projeto foi desenvolvido a partir do exemplo oficial do **Whisper.cpp** para Android, com as seguintes transformações:
-
-1. **UI Redesign**: De demo técnico para aplicação médica
-2. **Análise de Métricas**: Implementação de WPM e WER
-3. **Limpeza de Dados**: Processamento inteligente da saída do Whisper
-4. **Estados Visuais**: Interface responsiva e indicadores de progresso
-5. **Classificação Médica**: Sistema de cores e avaliação de risco
-
----
-
-**Desenvolvido com ❤️ para ajudar na detecção precoce de AVC**
-
-*AnalisAVC - Sua fala pode salvar sua vida* 🧠💚
+> **Aviso médico:** este aplicativo é uma **ferramenta de apoio**.  Ele **não substitui** uma consulta médica.  Em caso de alteração significativa, procure um profissional de saúde.

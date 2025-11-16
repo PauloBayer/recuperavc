@@ -35,15 +35,11 @@ object WhisperCpuConfig {
         
         // MAXIMUM AGGRESSIVE threading for whisper.cpp optimization
         // Use as many cores as possible for fastest processing
-        return when {
-            // For flagship devices (8+ cores): Use ALL cores except 1 (MAXIMUM performance)
-            totalCores >= 8 -> (totalCores - 1).coerceAtLeast(6)
-            
-            // For mid-range devices (4-7 cores): Use ALL cores (MAXIMUM performance)
-            totalCores >= 4 -> totalCores
-            
-            // For low-end devices: Use all available cores
-            else -> totalCores.coerceAtLeast(2)
+        return if (highPerfCores > 0) {
+                (highPerfCores + 2).coerceAtMost(6)
+            } else {
+                totalCores.coerceAtLeast(2)
+            }
         }.also { threadCount ->
             Log.d("WhisperCpuConfig", "MAXIMUM AGGRESSIVE threading: $threadCount (Total cores: $totalCores, High-perf: $highPerfCores)")
         }

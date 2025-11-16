@@ -1,6 +1,7 @@
 package com.recuperavc
 
 import android.os.Bundle
+import androidx.core.view.WindowCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -24,6 +25,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
             WhisperCppDemoTheme {
                 var route by remember { mutableStateOf(AppRoute.Home) }
