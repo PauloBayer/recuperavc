@@ -204,6 +204,7 @@ fun MotionTestScreen(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.systemBars)
             .background(bgRoot)
             .pointerInput(testStarted, finished) {
                 detectTapGestures(
@@ -305,7 +306,8 @@ fun MotionTestScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(24.dp),
+                    .padding(24.dp)
+                    .navigationBarsPadding(),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
