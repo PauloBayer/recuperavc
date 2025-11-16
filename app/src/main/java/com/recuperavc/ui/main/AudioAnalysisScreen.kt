@@ -301,6 +301,7 @@ private fun AudioAnalysisContent(
 ) {
     val root = Modifier
         .fillMaxSize()
+        .windowInsetsPadding(WindowInsets.systemBars)
         .let { base ->
             when {
                 appliedContrast -> base.background(Color.Black)
@@ -333,7 +334,7 @@ private fun AudioAnalysisContent(
                 fontSize = 18.sp * appliedScale,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier
-                    .padding(top = 72.dp)
+                    .padding(top = 72.dp + WindowInsets.statusBars.asPaddingValues().calculateTopPadding())
                     .align(Alignment.TopCenter)
             )
         }

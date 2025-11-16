@@ -144,7 +144,11 @@ fun SettingsScreen(
 
     val headerHeight = 160.dp
 
-    Box(modifier = Modifier.fillMaxSize().background(appliedBackground)) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .background(appliedBackground)
+        .windowInsetsPadding(WindowInsets.systemBars)
+    ) {
 
         // HEADER
         Box(modifier = Modifier.fillMaxWidth().height(headerHeight)) {
@@ -186,6 +190,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = headerHeight, start = 16.dp, end = 16.dp, bottom = 16.dp)
+                .windowInsetsPadding(WindowInsets.navigationBars)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

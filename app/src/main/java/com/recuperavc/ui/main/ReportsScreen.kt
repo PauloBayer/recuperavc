@@ -66,7 +66,7 @@ fun ReportsScreen(
     val initial: InitialSettings? = rememberInitialSettings(settings)
     if (initial == null) {
         PaintSystemBars(background = Color.Black, lightIcons = false)
-        Box(Modifier.fillMaxSize().background(Color.Black)) {}
+        Box(Modifier.fillMaxSize().background(Color.Black).systemBarsPadding()) {}
         return
     }
 
@@ -149,7 +149,7 @@ fun ReportsScreen(
             phrases = db.phraseDao().getAll()
         }
 
-        Box(modifier = Modifier.fillMaxSize().background(p.bg)) {
+        Box(modifier = Modifier.fillMaxSize().background(p.bg).systemBarsPadding()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
