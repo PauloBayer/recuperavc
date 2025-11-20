@@ -1,0 +1,130 @@
+/* ===== Estilo base ===== */
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(217, 217, 217, 0.15);
+  border-radius: 0 0 10px 10px;
+  padding: 1rem 2rem;
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+}
+
+/* lista principal */
+.nav-list {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  list-style: none;
+  width: 70%;
+  transition: all 0.3s ease;
+  margin: 0;
+  padding: 0;
+}
+
+.nav-list li {
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+/* links */
+.nav-list a {
+  color: #ffffff;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.nav-list a:hover {
+  color: chartreuse;
+}
+
+/* ícone do menu (hambúrguer) */
+.menu-icon {
+  display: none;
+  font-size: 2rem;
+  color: #ffffff;
+  cursor: pointer;
+  z-index: 1100;
+}
+
+/* ===== Responsividade ===== */
+@media (max-width: 1024px) {
+  .header {
+    justify-content: space-between;
+    padding: 0.5rem 1rem; 
+  }
+
+  .menu-icon {
+    display: block;
+  }
+
+  .nav-list {
+    position: fixed;
+    top: 60px; 
+    left: 0; 
+    flex-direction: column;
+    background-color: rgba(35, 50, 32, 0.97);
+    width: 60%;
+    max-width: 300px;
+    height: 0;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    border-radius: 0 10px 10px 0;
+    transition: all 0.4s ease;
+  }
+
+  /* Quando o menu estiver ativo */
+  .nav-list.active {
+    height: auto;
+    opacity: 1;
+    pointer-events: all;
+    padding: 1.5rem 0;
+    box-shadow: 2px 4px 10px rgba(0, 0, 0, 0.4); /* invertido p/ sombra à direita */
+  }
+
+  .nav-list li {
+    padding: 1rem 0;
+    width: 100%;
+    text-align: center;
+  }
+
+  .nav-list a {
+    display: block;
+    width: 100%;
+    color: #ffffff;
+    font-size: 1.1rem;
+  }
+
+  .nav-list a:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: chartreuse;
+  }
+}
+
+/* ===== (celulares) ===== */
+@media (max-width: 600px) {
+  .header {
+    padding: 0.4rem 0.8rem; 
+  }
+
+  .nav-list {
+    width: 80%;
+    border-radius: 0 10px 10px 0;
+    max-width: none;
+  }
+
+  .menu-icon {
+    font-size: 1.8rem;
+  }
+
+  .nav-list a {
+    font-size: 1rem;
+  }
+}

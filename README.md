@@ -1,3 +1,6 @@
+# Landing Page
+Você pode acessar uma curta apresentação do projeto [aqui](https://wwww.google.com).
+
 # Para rodar o projeto:
 
 O modelo do Whispper não vem junto com o repositório, pois ele é muito pesado. Ele precisa ser baixado a parte de depois colocado na pasta correta. Siga os passos:
