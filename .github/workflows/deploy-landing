@@ -1,0 +1,63 @@
+name: Deploy landing page to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]   # ou master, dependendo do seu repo
+  workflow_dispatch:      # permite rodar manualmente pelo tab "Actions"
+
+permissions:
+  contents: read
+  pages: write      # para publicar no Pages
+  id-token: write   # para o deploy ser autorizado
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    # tudo que for "run" nesse job vai rodar a partir da subpasta da landing-page
+    defaults:
+      run:
+        working-directory: ./landing-page
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Build landing
+        run: npm run build
+
+      - name: Upload static files as artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # caminho da pasta gerada pelo build, RELATIVO à raiz do repo
+          # Vite:  ./landing/dist
+          # CRA:   ./landing/build
+          path: ./landing-page/build
+          # se for CRA, troque para:
+          # path: ./landing/build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
