@@ -1,0 +1,254 @@
+.section-creators {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 100vh;
+  padding: 8% 6% 6%;
+  margin: 5% 0;
+  box-sizing: border-box;
+
+  gap: 3rem;
+}
+
+.section-creators-header {
+  max-width: 700px;
+  text-align: center;
+}
+
+.section-creators-header h2 {
+  font-size: 2rem;
+  margin-bottom: 0.8rem;
+}
+
+.section-creators-header p {
+  font-size: 1.05rem;
+  line-height: 1.7;
+  opacity: 0.95;
+}
+
+.creators-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: 2.5rem;
+  width: 100%;
+  max-width: 1100px;
+}
+
+.creator-card {
+  position: relative;
+  flex: 1 1 280px;
+  max-width: 320px;
+
+  padding: 2.2rem 1.8rem 1.9rem;
+  box-sizing: border-box;
+
+  border-radius: 18px;
+  background: linear-gradient(
+    145deg,
+    rgba(183, 213, 177, 0.55),
+    rgba(104, 136, 98, 0.75)
+  );
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+
+  overflow: hidden;
+  isolation: isolate;
+  transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
+}
+
+.creator-card::before {
+  content: '';
+  position: absolute;
+  inset: -40%;
+  background: radial-gradient(
+    circle at top,
+    rgba(255, 255, 255, 0.16),
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+
+.creator-card:hover {
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.creator-card:hover::before {
+  opacity: 1;
+}
+
+.creator-avatar-wrapper {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  padding: 4px;
+  margin-bottom: 1.1rem;
+
+  background: conic-gradient(
+    from 160deg,
+    #4f46e5,
+    #a3e635,
+    #22c55e,
+    #4f46e5
+  );
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.creator-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+
+  border: 3px solid rgba(35, 50, 32, 0.95);
+  background-color: #233220;
+}
+
+.creator-name {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+  color: #ffffff;
+}
+
+.creator-role {
+  font-size: 0.98rem;
+  line-height: 1.6;
+  margin-bottom: 1.4rem;
+  color: #f3f7f2;
+  opacity: 0.95;
+}
+
+.creator-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+
+  padding: 0.6rem 1.4rem;
+  border-radius: 999px;
+
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.98rem;
+
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.55);
+  transition: background 0.25s ease, transform 0.18s ease, box-shadow 0.25s ease;
+
+  margin-top: auto;
+}
+
+.creator-link-icon {
+  font-size: 0.9rem;
+  transform: translateY(-1px);
+}
+
+.creator-link:hover {
+  background: linear-gradient(135deg, #4338ca, #4f46e5);
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.7);
+}
+
+@media (max-width: 1024px) {
+  .section-creators {
+    padding: 9% 6% 7%;
+    gap: 2.5rem;
+  }
+
+  .section-creators-header h2 {
+    font-size: 1.8rem;
+  }
+
+  .section-creators-header p {
+    font-size: 1rem;
+  }
+
+  .creators-grid {
+    gap: 2rem;
+  }
+
+  .creator-card {
+    flex: 1 1 260px;
+    max-width: 360px;
+  }
+
+  .creator-avatar-wrapper {
+    width: 110px;
+    height: 110px;
+  }
+
+  .creator-name {
+    font-size: 1.2rem;
+  }
+
+  .creator-role {
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .section-creators {
+    padding: 20% 5% 12%;
+    margin: 0;
+    gap: 2.2rem;
+  }
+
+  .section-creators-header {
+    max-width: 100%;
+  }
+
+  .section-creators-header h2 {
+    font-size: 1.6rem;
+  }
+
+  .section-creators-header p {
+    font-size: 0.95rem;
+  }
+
+  .creators-grid {
+    flex-direction: column;
+    align-items: center;
+    gap: 1.8rem;
+  }
+
+  .creator-card {
+    width: 100%;
+    max-width: 420px;
+    padding: 2rem 1.6rem 1.8rem;
+  }
+
+  .creator-avatar-wrapper {
+    width: 100px;
+    height: 100px;
+  }
+
+  .creator-name {
+    font-size: 1.15rem;
+  }
+
+  .creator-role {
+    font-size: 0.94rem;
+  }
+
+  .creator-link {
+    width: 100%;
+    font-size: 0.96rem;
+  }
+}
