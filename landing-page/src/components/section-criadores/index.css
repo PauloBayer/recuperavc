@@ -60,7 +60,7 @@
   align-items: center;
   text-align: center;
 
-  overflow: hidden;
+  overflow: visible;
   isolation: isolate;
   transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
 }
@@ -250,5 +250,8 @@
   .creator-link {
     width: 100%;
     font-size: 0.96rem;
+    margin-top: 1.4rem;
+    padding-left: 0;
+    padding-right: 0;
   }
 }

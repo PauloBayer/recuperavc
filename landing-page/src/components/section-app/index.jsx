@@ -41,7 +41,7 @@ export default function SectionApp() {
         <p>
           O AVC é uma das principais causas de incapacidade funcional no Brasil.
           Entre as sequelas mais comuns estão as dificuldades de fala, compreensão
-          e coordenação motora fina. Pensando nisso, o <strong>AnalisAVC</strong> foi
+          e coordenação motora fina. Pensando nisso, o <strong>RecuperAVC</strong> foi
           criado para oferecer uma ferramenta tecnológica complementar ao processo
           de reabilitação, especialmente voltada a pacientes, familiares e
           profissionais da saúde.

@@ -1,5 +1,5 @@
 # Landing Page
-Você pode acessar uma curta apresentação do projeto [aqui](https://wwww.google.com).
+Você pode acessar uma curta apresentação do projeto [aqui](https://paulobayer.github.io/recuperavc/).
 
 # Para rodar o projeto:
 
