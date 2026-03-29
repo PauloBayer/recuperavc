@@ -4,11 +4,15 @@ package com.recuperavc.ui.main
 
 import android.content.Context
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -380,7 +384,7 @@ fun SentenceArrangeMultiRound(
             results.add(result)
             scope.launch {
                 val nextDeferred = async(Dispatchers.IO) { phraseManager.getNextPhrase(selectedType) }
-                delay(3000) // Keep banner visible 3s before swapping phrase
+                delay(2500)
                 currentPhrase = nextDeferred.await()
             }
         },
@@ -450,10 +454,9 @@ fun SentenceArrangeScreen(
     // Keep the banner kind stable and visible for 3s; avoid content flip during fade-out
     LaunchedEffect(result) {
         if (result != null) {
-            bannerIsCorrect = result  // snapshot the kind once
-            delay(3000)
-            result = null             // hide (AnimatedVisibility exit plays, content remains stable)
-            // keep bannerIsCorrect as last kind; it will be overwritten on next result
+            bannerIsCorrect = result
+            delay(2000)
+            result = null
         }
     }
 
@@ -504,9 +507,21 @@ fun SentenceArrangeScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    AnimatedVisibility(
+                        visible = result != null,
+                        enter = fadeIn(tween(300)) + expandVertically(tween(300)),
+                        exit = fadeOut(tween(400)) + shrinkVertically(tween(400))
+                    ) {
+                        ResultMessageBox(
+                            isCorrect = (bannerIsCorrect == true),
+                            appliedContrast = appliedContrast,
+                            appliedScale = appliedScale
+                        )
+                    }
+
                     Text(
                         text = "Monte a frase:",
                         color = textPrimary,
@@ -514,71 +529,69 @@ fun SentenceArrangeScreen(
                         fontWeight = FontWeight.Medium
                     )
 
-                    // Área de frase montada
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(cardTint)
-                            .padding(12.dp)
-                    ) {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            if (arrangedWords.isEmpty()) {
-                                AssistiveHint(textPrimary = textPrimary, appliedScale = appliedScale)
-                            } else {
-                                arrangedWords.forEach { word ->
+                    AnimatedContent(
+                        targetState = phrase,
+                        transitionSpec = {
+                            fadeIn(tween(450, delayMillis = 100)) togetherWith fadeOut(tween(300))
+                        },
+                        label = "phrase_words"
+                    ) { _ ->
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(cardTint)
+                                    .padding(16.dp)
+                                    .defaultMinSize(minHeight = 72.dp),
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    if (arrangedWords.isEmpty()) {
+                                        AssistiveHint(textPrimary = textPrimary, appliedScale = appliedScale)
+                                    } else {
+                                        arrangedWords.forEach { word ->
+                                            WordChip(
+                                                text = word,
+                                                onClick = ({
+                                                    arrangedWords = arrangedWords - word
+                                                    availableWords = availableWords + word
+                                                }).withSfx(sfx, Sfx.CLICK),
+                                                shape = RoundedCornerShape(18.dp),
+                                                container = chipArrContainer,
+                                                content = chipArrText,
+                                                appliedScale = appliedScale
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Divider(color = textPrimary.copy(alpha = .2f))
+
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                availableWords.forEach { word ->
                                     WordChip(
                                         text = word,
                                         onClick = ({
-                                            arrangedWords = arrangedWords - word
-                                            availableWords = availableWords + word
+                                            arrangedWords = arrangedWords + word
+                                            availableWords = availableWords - word
                                         }).withSfx(sfx, Sfx.CLICK),
                                         shape = RoundedCornerShape(18.dp),
-                                        container = chipArrContainer,
-                                        content = chipArrText,
+                                        container = chipAvailContainer,
+                                        content = chipAvailText,
                                         appliedScale = appliedScale
                                     )
                                 }
                             }
-                        }
-
-                        AnimatedVisibility(
-                            visible = result != null,
-                            enter = fadeIn(),
-                            exit = fadeOut()
-                        ) {
-                            ResultMessageBox(
-                                isCorrect = (bannerIsCorrect == true),
-                                appliedContrast = appliedContrast,
-                                appliedScale = appliedScale
-                            )
-                        }
-                    }
-
-                    Divider(color = textPrimary.copy(alpha = .2f))
-
-                    // Palavras disponíveis
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        availableWords.forEach { word ->
-                            WordChip(
-                                text = word,
-                                onClick = ({
-                                    arrangedWords = arrangedWords + word
-                                    availableWords = availableWords - word
-                                }).withSfx(sfx, Sfx.CLICK),
-                                shape = RoundedCornerShape(18.dp),
-                                container = chipAvailContainer,
-                                content = chipAvailText,
-                                appliedScale = appliedScale
-                            )
                         }
                     }
 
@@ -586,6 +599,9 @@ fun SentenceArrangeScreen(
                 }
 
                 /* ---------------- Bottom Actions ---------------- */
+                val verifyBlocked = result != null
+                val clearBlocked = result == true
+
                 FlowRow(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -603,9 +619,14 @@ fun SentenceArrangeScreen(
                             availableWords = words.shuffled()
                             result = null
                         },
-                        colors = ButtonDefaults.textButtonColors(contentColor = accent),
+                        enabled = !clearBlocked,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = accent,
+                            disabledContainerColor = Color.Transparent,
+                            disabledContentColor = accent.copy(alpha = 0.38f)
+                        ),
                         modifier = Modifier.height(actionHeight)
-                    ) { Text("Limpar", color = accent, fontSize = 15.sp * appliedScale) }
+                    ) { Text("Limpar", fontSize = 15.sp * appliedScale) }
 
                     // SALVAR TESTE
                     if (canFinish) {
@@ -621,9 +642,10 @@ fun SentenceArrangeScreen(
                     }
 
                     // VERIFICAR
-                    val canVerify = arrangedWords.isNotEmpty()
+                    val canVerify = arrangedWords.isNotEmpty() && !verifyBlocked
                     ExtendedFloatingActionButton(
                         onClick = {
+                            if (verifyBlocked) return@ExtendedFloatingActionButton
                             if (!canVerify) {
                                 sfx.play(Sfx.WRONG_ANSWER)
                             } else {
@@ -652,8 +674,11 @@ fun SentenceArrangeScreen(
                                 }
                             }
                         },
-                        containerColor = accent,
-                        contentColor = accentText,
+                        containerColor = if (verifyBlocked || arrangedWords.isEmpty()) accent.copy(alpha = 0.38f) else accent,
+                        contentColor = if (verifyBlocked || arrangedWords.isEmpty()) accentText.copy(alpha = 0.38f) else accentText,
+                        elevation = FloatingActionButtonDefaults.elevation(
+                            defaultElevation = if (verifyBlocked || arrangedWords.isEmpty()) 0.dp else 6.dp
+                        ),
                         modifier = Modifier.height(actionHeight)
                     ) { Text("Verificar", fontSize = 15.sp * appliedScale, fontWeight = FontWeight.Medium) }
                 }
@@ -715,21 +740,21 @@ private fun AssistiveHint(textPrimary: Color, appliedScale: Float) {
 
 @Composable
 private fun ResultMessageBox(isCorrect: Boolean, appliedContrast: Boolean, appliedScale: Float) {
-    val bg = if (isCorrect) Color(0xFFDCFCE7) else if (appliedContrast) Color(0xFFFFF3CD) else Color(0xFFFFE4E6)
-    val fg = if (isCorrect) Color(0xFF065F46) else if (appliedContrast) Color(0xFF222222) else Color(0xFF991B1B)
+    val bg = if (isCorrect) Color(0xFF2E7D32) else if (appliedContrast) Color(0xFF7B4F00) else Color(0xFFC62828)
     Box(
         modifier = Modifier
-            .padding(top = 12.dp)
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(bg)
-            .padding(10.dp)
+            .padding(vertical = 20.dp, horizontal = 16.dp),
+        contentAlignment = Alignment.Center
     ) {
         Text(
-            text = if (isCorrect) "Perfeito! ✔︎" else "A frase está errada. Tente novamente.",
-            color = fg,
-            fontSize = 14.sp * appliedScale,
-            fontWeight = FontWeight.Medium
+            text = if (isCorrect) "Perfeito! ✔" else "Não está certa. Tente novamente.",
+            color = Color.White,
+            fontSize = (if (isCorrect) 22f else 17f).sp * appliedScale,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
         )
     }
 }
