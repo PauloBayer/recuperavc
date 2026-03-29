@@ -1,0 +1,84 @@
+.App {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 20%;
+  background: linear-gradient(135deg, #233220, #405c3a);
+  min-height: 100vh;
+  padding: 5% 10%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+html{
+  scroll-behavior: smooth;
+}
+
+/* cores dos textos */
+p, h1, h2 {
+  color: #ffffff;
+  margin: 0;
+}
+
+/* tamanhos padrão para desktop */
+h1 {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+h2 {
+  font-size: 1.8rem;
+  margin-bottom: 0.8rem;
+}
+
+p {
+  font-size: 1.1rem;
+  line-height: 1.7;
+  max-width: 900px;
+}
+
+/* ===== Responsividade ===== */
+
+/* Tablets (iPads) */
+@media (max-width: 1024px) {
+  .App {
+    padding: 0 !important;
+    gap: 8%;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+  }
+
+  p {
+    font-size: 1rem;
+    max-width: 700px;
+  }
+}
+
+/* Celulares */
+@media (max-width: 768px) {
+  .App {
+    padding: 0 !important;
+    gap: 6%;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+  }
+
+  h2 {
+    font-size: 1.3rem;
+  }
+
+  p {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    max-width: 100%;
+  }
+}
