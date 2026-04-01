@@ -464,7 +464,11 @@ private fun AudioAnalysisContent(
                     lineHeight = 32.sp * appliedScale
                 )
 
-                Column {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(top = 16.dp)
+                ) {
                     if (sessionCount >= 3) {
                         Button(
                             onClick = onFinishSession,
@@ -476,7 +480,7 @@ private fun AudioAnalysisContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 24.dp)
-                                .height(48.dp)
+                                .height(56.dp)
                         ) {
                             Text(
                                 text = "Registrar e Salvar Sessão",
@@ -484,30 +488,44 @@ private fun AudioAnalysisContent(
                                 fontSize = 16.sp * appliedScale
                             )
                         }
-                        Spacer(Modifier.height(16.dp))
                     }
 
-                    if (isRecording) {
+                    AnimatedVisibility(
+                        visible = isRecording,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ) {
                         Button(
                             onClick = onCancelRecording,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFD32F2F),
+                                containerColor = when {
+                                    appliedContrast -> Color(0xFFFF5252)
+                                    appliedDark -> Color(0xFFB71C1C)
+                                    else -> Color(0xFFD32F2F)
+                                },
                                 contentColor = Color.White
                             ),
+                            shape = RoundedCornerShape(16.dp),
                             modifier = Modifier
-                                .size(64.dp)
-                                .align(Alignment.CenterHorizontally),
-                            shape = CircleShape
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp)
+                                .height(56.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Cancelar gravação",
-                                modifier = Modifier.size(36.dp)
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "Cancelar gravação",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 16.sp * appliedScale
                             )
                         }
                     }
 
-                    Spacer(Modifier.height(32.dp))
+                    Spacer(Modifier.height(20.dp))
                 }
             }
         }
@@ -757,11 +775,16 @@ private fun SessionSummaryScreen(
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.35f))
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.systemBars),
+            contentAlignment = Alignment.Center
+        ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp)
-                .align(Alignment.Center),
+                .padding(20.dp),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = cardContainer),
             elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 6.dp),
@@ -964,6 +987,7 @@ private fun SessionSummaryScreen(
                     shape = RoundedCornerShape(16.dp)
                 ) { Text("Voltar ao Início", fontSize = 16.sp * appliedScale) }
             }
+        }
         }
     }
 }

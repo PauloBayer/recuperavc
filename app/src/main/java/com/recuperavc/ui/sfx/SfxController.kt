@@ -58,7 +58,7 @@ fun rememberSfxController(maxStreams: Int = 8): SfxController {
 
     val controller = remember {
         val attrs = android.media.AudioAttributes.Builder()
-            .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+            .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
             .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
             .build()
 
