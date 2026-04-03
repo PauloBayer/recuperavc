@@ -37,6 +37,8 @@ captures/
 
 # Android Studio
 *.apk
+*.aab
+app/release/
 *.ap_
 *.dex
 *.class
