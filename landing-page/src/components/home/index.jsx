@@ -14,7 +14,8 @@ export default function Home(){
 
                 <div className='btnContainer'>
                     <a 
-                        href="https://1drv.ms/f/c/3a1476f72b82f7b5/IgBDUaHwRo2SRaE0pFFy1QEvAVAuYHx9dTg_kwuwo3_CiVY?e=T7ULbo" 
+                        // href="https://1drv.ms/f/c/3a1476f72b82f7b5/IgBDUaHwRo2SRaE0pFFy1QEvAVAuYHx9dTg_kwuwo3_CiVY?e=T7ULbo" 
+                        href="https://play.google.com/store/apps/details?id=com.recuperavc&pli=1" 
                         target="_blank" 
                         rel="noopener noreferrer" 
                         className='downloadButton'
