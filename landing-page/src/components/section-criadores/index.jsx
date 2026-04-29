@@ -2,7 +2,6 @@ import './index.css'
 import bayer from '../assets/img/bayer.jpg'
 import fellipe from '../assets/img/fellipe.jpg'
 import brawerman from '../assets/img/brawerman.jpg'
-import nina from '../assets/img/nina.jpg'
 
 export default function SectionCriadores(){
     const autores = [
@@ -21,7 +20,7 @@ export default function SectionCriadores(){
         // },
         {
         nome: 'Alessandro Brawerman',
-        funcao: 'Coordenador do Projeto',
+        funcao: 'Orientador do Projeto',
         linkedin: 'https://www.linkedin.com/in/brawerman/',
         foto: brawerman,
         },
