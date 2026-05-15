@@ -54,6 +54,8 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         private set
     var isCancelling by mutableStateOf(false)
         private set
+    var modelLoadFailed by mutableStateOf(false)
+        private set
     var transcriptionResult by mutableStateOf("")
         private set
     var analysisResult by mutableStateOf<AnalysisResult?>(null)
@@ -110,11 +112,16 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         try {
             copyAssets()
             loadBaseModel()
-            loadNewPhrase()
-            canTranscribe = true
-            isLoading = false
+            if (whisperContext == null) {
+                modelLoadFailed = true
+            } else {
+                loadNewPhrase()
+                canTranscribe = true
+            }
         } catch (e: Exception) {
             Log.w(LOG_TAG, e)
+            modelLoadFailed = true
+        } finally {
             isLoading = false
         }
     }
@@ -141,8 +148,10 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
 
     private suspend fun loadBaseModel() = withContext(Dispatchers.IO) {
         val models = application.assets.list("models/")
-        if (models != null) {
-            whisperContext = com.whispercpp.whisper.WhisperContext.createContextFromAsset(application.assets, "models/" + models[0])
+        if (!models.isNullOrEmpty()) {
+            whisperContext = com.whispercpp.whisper.WhisperContext.createContextFromAsset(
+                application.assets, "models/" + models[0]
+            )
         }
     }
 

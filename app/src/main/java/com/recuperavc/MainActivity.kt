@@ -5,10 +5,12 @@ import androidx.core.view.WindowCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.recuperavc.data.db.UserPreferences
 import com.recuperavc.ui.home.HomeScreen
 import com.recuperavc.ui.main.AudioAnalysisScreen
 import com.recuperavc.ui.main.MainScreenViewModel
@@ -26,8 +28,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        val prefs = UserPreferences(applicationContext)
         setContent {
-            WhisperCppDemoTheme {
+            val userDark by prefs.darkModeFlow.collectAsState(initial = false)
+            val userContrast by prefs.contrastFlow.collectAsState(initial = false)
+            WhisperCppDemoTheme(darkTheme = userDark || userContrast, dynamicColor = false) {
                 var route by remember { mutableStateOf(AppRoute.Home) }
                 when (route) {
                     AppRoute.Home -> HomeScreen(

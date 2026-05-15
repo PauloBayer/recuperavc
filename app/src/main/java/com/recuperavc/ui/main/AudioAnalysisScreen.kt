@@ -25,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Speed
@@ -118,6 +119,20 @@ fun AudioAnalysisScreen(
         background = if (appliedContrast || appliedDark) Color.Black else BackgroundGreen,
         lightIcons = !(appliedContrast || appliedDark)
     )
+
+    if (viewModel.modelLoadFailed) {
+        BackHandler(enabled = true) { sfx.play(Sfx.CLICK); onBack() }
+        ModelLoadErrorScreen(
+            appliedContrast = appliedContrast,
+            appliedDark = appliedDark,
+            appliedScale = appliedScale,
+            textPrimary = textPrimary,
+            accent = accent,
+            backgroundSolid = bgSolid,
+            onBack = { sfx.play(Sfx.CLICK); onBack() }
+        )
+        return
+    }
 
     var showEndDialog by remember { mutableStateOf(false) }
 
@@ -663,6 +678,160 @@ private fun BackButton(onBack: () -> Unit, tint: Color) {
             tint = tint,
             modifier = Modifier.size(28.dp)
         )
+    }
+}
+
+@Composable
+private fun ModelLoadErrorScreen(
+    appliedContrast: Boolean,
+    appliedDark: Boolean,
+    appliedScale: Float,
+    textPrimary: Color,
+    accent: Color,
+    backgroundSolid: Color,
+    onBack: () -> Unit
+) {
+    val root = Modifier
+        .fillMaxSize()
+        .windowInsetsPadding(WindowInsets.systemBars)
+        .let { base ->
+            when {
+                appliedContrast -> base.background(Color.Black)
+                appliedDark -> base.background(backgroundSolid)
+                else -> base.background(
+                    brush = Brush.radialGradient(
+                        colors = listOf(GreenLight, GreenPrimary, BackgroundGreen),
+                        radius = 1200f
+                    )
+                )
+            }
+        }
+
+    val cardContainer = when {
+        appliedContrast -> Color.Black
+        appliedDark -> Color(0xFF1E1E1E)
+        else -> Color.White
+    }
+    val cardBorder = when {
+        appliedContrast -> BorderStroke(1.dp, accent.copy(alpha = 0.7f))
+        appliedDark -> BorderStroke(1.dp, Color.White.copy(alpha = 0.10f))
+        else -> null
+    }
+    val titleColor = when {
+        appliedContrast -> accent
+        appliedDark -> Color.White
+        else -> Color(0xFF1B1B1B)
+    }
+    val bodyColor = when {
+        appliedContrast -> Color.White
+        appliedDark -> Color(0xFFEDEDED)
+        else -> Color(0xFF3A3A3A)
+    }
+    val hintColor = when {
+        appliedContrast -> Color.White.copy(alpha = 0.85f)
+        appliedDark -> Color(0xFFCCCCCC)
+        else -> Color(0xFF555555)
+    }
+    val iconTint = when {
+        appliedContrast -> accent
+        appliedDark -> Color(0xFFFFB74D)
+        else -> Color(0xFFE65100)
+    }
+    val buttonContainer = when {
+        appliedContrast -> accent
+        appliedDark -> GreenDark
+        else -> Color.White
+    }
+    val buttonContent = when {
+        appliedContrast -> Color.Black
+        appliedDark -> Color.White
+        else -> Color(0xFF2E7D32)
+    }
+
+    Box(modifier = root) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.Start,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            BackButton(onBack, tint = if (appliedContrast || appliedDark) Color.White else OnBackground)
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = cardContainer),
+                elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 6.dp),
+                border = cardBorder,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ErrorOutline,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        text = "Modelo de IA indisponível",
+                        fontSize = 22.sp * appliedScale,
+                        fontWeight = FontWeight.Bold,
+                        color = titleColor,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 28.sp * appliedScale
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    Text(
+                        text = "Não conseguimos carregar o modelo necessário para o teste de voz. Sem ele, sua fala não pode ser analisada.",
+                        fontSize = 16.sp * appliedScale,
+                        color = bodyColor,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 22.sp * appliedScale
+                    )
+                    Spacer(Modifier.height(18.dp))
+                    Text(
+                        text = "Por favor, reporte este problema à equipe do app para que possamos ajudar você.",
+                        fontSize = 14.sp * appliedScale,
+                        color = hintColor,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 20.sp * appliedScale
+                    )
+                    Spacer(Modifier.height(24.dp))
+                    Button(
+                        onClick = onBack,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = buttonContainer,
+                            contentColor = buttonContent
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                    ) {
+                        Text(
+                            text = "Voltar para o início",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp * appliedScale
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
