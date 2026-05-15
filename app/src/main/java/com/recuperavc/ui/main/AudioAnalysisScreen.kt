@@ -27,9 +27,16 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlinx.coroutines.delay
 import com.recuperavc.R
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -376,113 +383,89 @@ private fun AudioAnalysisContent(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(Modifier.height(120.dp))
+                Spacer(Modifier.height(140.dp))
 
                 Text(
-                    text = "Pronuncie a frase abaixo\npara avaliar sua recuperação",
-                    fontSize = 20.sp * appliedScale,
-                    fontWeight = FontWeight.Medium,
+                    text = "Pronuncie a frase abaixo:",
+                    fontSize = 22.sp * appliedScale,
+                    fontWeight = FontWeight.Bold,
                     color = textPrimary,
                     textAlign = TextAlign.Center,
                     lineHeight = 28.sp * appliedScale
                 )
+                Spacer(Modifier.height(20.dp))
 
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    RecordingCircles(
-                        isRecording = isRecording,
-                        isProcessing = isProcessing,
-                        isCancelling = isCancelling,
-                        enabled = canTranscribe && !isProcessing && !isCancelling,
-                        onClick = onRecordTapped,
-                        onCancel = onCancelRecording,
-                        appliedContrast = appliedContrast,
-                        appliedDark = appliedDark,
-                        accent = accent
-                    )
-                }
+                PhrasePresentation(
+                    text = phraseText,
+                    appliedContrast = appliedContrast,
+                    appliedDark = appliedDark,
+                    appliedScale = appliedScale,
+                    textPrimary = textPrimary,
+                    accent = accent
+                )
 
-                val chipContainer = when {
-                    appliedContrast -> Color.Black
-                    appliedDark -> Color(0xFF2A2A2A)
-                    else -> Color.White.copy(alpha = 0.96f)
-                }
-                val chipLabel = when {
-                    appliedContrast -> Color.White
-                    appliedDark -> Color(0xFFEDEDED)
-                    else -> Color(0xFF1B1B1B)
-                }
-                val chipBorder = when {
-                    appliedContrast -> BorderStroke(1.dp, accent.copy(alpha = 0.7f))
-                    appliedDark -> BorderStroke(1.dp, Color.White.copy(alpha = 0.10f))
-                    else -> null
-                }
-                val chipIconBg = when {
-                    appliedContrast -> accent
-                    appliedDark -> GreenDark
-                    else -> GreenDark
-                }
-                val chipIconTint = if (appliedContrast) Color.Black else Color.White
+                Spacer(Modifier.weight(1f))
+
                 AnimatedVisibility(
                     visible = isRecording && !isProcessing && !isCancelling,
                     enter = fadeIn() + expandVertically(),
                     exit = fadeOut() + shrinkVertically()
                 ) {
-                    Card(
-                        shape = RoundedCornerShape(50),
-                        colors = CardDefaults.cardColors(containerColor = chipContainer),
-                        elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 3.dp),
-                        border = chipBorder,
-                        modifier = Modifier.padding(top = 12.dp, bottom = 12.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .clip(CircleShape)
-                                    .background(chipIconBg),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Info,
-                                    contentDescription = null,
-                                    tint = chipIconTint,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                            }
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = "Toque no botão grande novamente para enviar agora",
-                                fontSize = 14.sp * appliedScale,
-                                color = chipLabel
-                            )
-                        }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        RecordingPill(
+                            appliedContrast = appliedContrast,
+                            appliedDark = appliedDark,
+                            appliedScale = appliedScale
+                        )
+                        Spacer(Modifier.height(12.dp))
                     }
                 }
 
-                Text(
-                    text = phraseText,
-                    fontSize = 24.sp * appliedScale,
-                    fontWeight = FontWeight.Bold,
-                    color = textPrimary,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 32.sp * appliedScale
+                RecordingCircles(
+                    isRecording = isRecording,
+                    isProcessing = isProcessing,
+                    isCancelling = isCancelling,
+                    enabled = canTranscribe && !isProcessing && !isCancelling,
+                    onClick = onRecordTapped,
+                    onCancel = onCancelRecording,
+                    appliedContrast = appliedContrast,
+                    appliedDark = appliedDark,
+                    accent = accent
                 )
+
+                AnimatedVisibility(
+                    visible = !isRecording && !isProcessing && !isCancelling,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    TapToRecordHint(appliedScale = appliedScale)
+                }
+                AnimatedVisibility(
+                    visible = isRecording && !isProcessing && !isCancelling,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Text(
+                        text = "Toque novamente para enviar",
+                        fontSize = 16.sp * appliedScale,
+                        fontWeight = FontWeight.Medium,
+                        color = textPrimary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 10.dp)
+                    )
+                }
+
+                Spacer(Modifier.weight(1f))
 
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.padding(top = 16.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
                 ) {
                     if (sessionCount >= 3) {
                         Button(
@@ -520,27 +503,25 @@ private fun AudioAnalysisContent(
                                 },
                                 contentColor = Color.White
                             ),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = RoundedCornerShape(18.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 24.dp)
-                                .height(56.dp)
+                                .padding(horizontal = 12.dp)
+                                .height(64.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = null,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(24.dp)
                             )
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(10.dp))
                             Text(
                                 text = "Cancelar gravação",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 16.sp * appliedScale
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 17.sp * appliedScale
                             )
                         }
                     }
-
-                    Spacer(Modifier.height(20.dp))
                 }
             }
         }
@@ -579,6 +560,132 @@ private fun AudioAnalysisContent(
 
 /* --------------------------- Recording UI --------------------------- */
 
+@Composable
+private fun PhrasePresentation(
+    text: String,
+    appliedContrast: Boolean,
+    appliedDark: Boolean,
+    appliedScale: Float,
+    textPrimary: Color,
+    accent: Color
+) {
+    Text(
+        text = text,
+        fontSize = 34.sp * appliedScale,
+        fontWeight = FontWeight.ExtraBold,
+        color = textPrimary,
+        textAlign = TextAlign.Center,
+        lineHeight = 42.sp * appliedScale,
+        letterSpacing = 0.5.sp,
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+@Composable
+private fun RecordingPill(
+    appliedContrast: Boolean,
+    appliedDark: Boolean,
+    appliedScale: Float
+) {
+    val recordingColor = when {
+        appliedContrast -> Color(0xFFFF5252)
+        appliedDark -> Color(0xFFEF5350)
+        else -> Color(0xFFD32F2F)
+    }
+    val pillBg = when {
+        appliedContrast -> Color.White.copy(alpha = 0.10f)
+        appliedDark -> recordingColor.copy(alpha = 0.18f)
+        else -> Color.White.copy(alpha = 0.92f)
+    }
+    val timerColor = when {
+        appliedContrast -> Color.White
+        appliedDark -> Color(0xFFEDEDED)
+        else -> Color(0xFF1B1B1B)
+    }
+
+    var elapsedSeconds by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        elapsedSeconds = 0
+        while (true) {
+            delay(1000L)
+            elapsedSeconds++
+        }
+    }
+
+    val pulseTransition = rememberInfiniteTransition(label = "rec_pulse")
+    val pulseAlpha by pulseTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(700, easing = EaseInOut), RepeatMode.Reverse),
+        label = "pulse_alpha"
+    )
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .clip(RoundedCornerShape(28.dp))
+            .background(pillBg)
+            .padding(horizontal = 22.dp, vertical = 12.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(12.dp)
+                .clip(CircleShape)
+                .background(recordingColor.copy(alpha = pulseAlpha))
+        )
+        Text(
+            text = "GRAVANDO",
+            color = recordingColor,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 16.sp * appliedScale,
+            letterSpacing = 1.4.sp
+        )
+        Text(
+            text = String.format("%02d:%02d", elapsedSeconds / 60, elapsedSeconds % 60),
+            color = timerColor,
+            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp * appliedScale
+        )
+    }
+}
+
+
+@Composable
+private fun TapToRecordHint(
+    appliedScale: Float
+) {
+    val color = Color.White
+    val transition = rememberInfiniteTransition(label = "hint")
+    val arrowOffset by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 6f,
+        animationSpec = infiniteRepeatable(tween(800, easing = EaseInOut), RepeatMode.Reverse),
+        label = "arrow"
+    )
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(top = 4.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.KeyboardArrowUp,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier
+                .size(32.dp)
+                .offset(y = (-arrowOffset).dp)
+        )
+        Text(
+            text = "Toque no microfone para começar",
+            fontSize = 16.sp * appliedScale,
+            fontWeight = FontWeight.Medium,
+            color = color,
+            textAlign = TextAlign.Center,
+            lineHeight = 22.sp * appliedScale
+        )
+    }
+}
+
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 private fun RecordingCircles(
@@ -598,53 +705,83 @@ private fun RecordingCircles(
     )
 
     val infinite = rememberInfiniteTransition(label = "recording")
-    val pulse = rememberInfiniteTransition(label = "pulse")
-    val outerScale by infinite.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.3f,
-        animationSpec = infiniteRepeatable(tween(2000, easing = EaseInOut), RepeatMode.Reverse),
-        label = "outer"
-    )
-    val middleScale by infinite.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.2f,
-        animationSpec = infiniteRepeatable(tween(2300, easing = EaseInOut), RepeatMode.Reverse),
-        label = "middle"
-    )
-    val innerScale by infinite.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.1f,
-        animationSpec = infiniteRepeatable(tween(2600, easing = EaseInOut), RepeatMode.Reverse),
-        label = "inner"
-    )
+    val barCount = 28
+    val barAnimations = (0 until barCount).map { i ->
+        val seedHigh = ((i * 53 + 17) % 100) / 100f
+        val seedLow = ((i * 31 + 7) % 100) / 100f
+        val anim by infinite.animateFloat(
+            initialValue = 0.18f + seedLow * 0.18f,
+            targetValue = 0.55f + seedHigh * 0.45f,
+            animationSpec = infiniteRepeatable(
+                tween(420 + ((i * 71) % 380), easing = EaseInOut),
+                RepeatMode.Reverse
+            ),
+            label = "bar_$i"
+        )
+        anim
+    }
+
     val outerColor: Color
     val middleColor: Color
     val innerColor: Color
+    val barColor: Color
     if (appliedContrast) {
-        outerColor = Color.White.copy(alpha = 0.20f)
-        middleColor = Color.White.copy(alpha = 0.40f)
-        innerColor = accent.copy(alpha = 0.75f)
+        outerColor = Color.White.copy(alpha = 0.18f)
+        middleColor = Color.White.copy(alpha = 0.32f)
+        innerColor = accent.copy(alpha = 0.70f)
+        barColor = accent
+    } else if (appliedDark) {
+        outerColor = GreenLight.copy(alpha = 0.15f)
+        middleColor = GreenLight.copy(alpha = 0.25f)
+        innerColor = GreenAccent.copy(alpha = 0.35f)
+        barColor = Color(0xFF8BC34A)
     } else {
-        outerColor = GreenLight.copy(alpha = if (isRecording || isProcessing) 0.20f else 0.15f)
-        middleColor = GreenLight.copy(alpha = if (isRecording || isProcessing) 0.40f else 0.25f)
-        innerColor = GreenAccent.copy(alpha = if (isRecording || isProcessing) 0.60f else 0.35f)
+        outerColor = GreenLight.copy(alpha = 0.15f)
+        middleColor = GreenLight.copy(alpha = 0.25f)
+        innerColor = GreenAccent.copy(alpha = 0.35f)
+        barColor = Color.White
     }
+
+    val recordingBg = when {
+        appliedContrast -> Color(0xFFFF5252)
+        appliedDark -> Color(0xFFB71C1C)
+        else -> Color(0xFFD32F2F)
+    }
+    val micBg = when {
+        !enabled -> Color.Gray.copy(alpha = 0.7f)
+        isRecording -> recordingBg
+        appliedContrast -> accent
+        else -> GreenDark
+    }
+    val micIcon = if (appliedContrast && !isRecording) Color.Black else Color.White
 
     Box(modifier = Modifier.size(300.dp), contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.size(300.dp)) {
             val center = size.center
-            drawCircle(color = outerColor, radius = 140.dp.toPx() * (if (isRecording) outerScale else 1f), center = center)
-            drawCircle(color = middleColor, radius = 110.dp.toPx() * (if (isRecording) middleScale else 1f), center = center)
-            drawCircle(color = innerColor, radius = 80.dp.toPx() * (if (isRecording) innerScale else 1f), center = center)
+            if (isRecording) {
+                val rStart = 78.dp.toPx()
+                val maxLen = 38.dp.toPx()
+                barAnimations.forEachIndexed { i, value ->
+                    val angle = (i * 2.0 * PI / barCount).toFloat()
+                    val length = 8.dp.toPx() + value * maxLen
+                    val sx = center.x + cos(angle) * rStart
+                    val sy = center.y + sin(angle) * rStart
+                    val ex = center.x + cos(angle) * (rStart + length)
+                    val ey = center.y + sin(angle) * (rStart + length)
+                    drawLine(
+                        color = barColor,
+                        start = Offset(sx, sy),
+                        end = Offset(ex, ey),
+                        strokeWidth = 4.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                }
+            } else {
+                drawCircle(color = outerColor, radius = 140.dp.toPx(), center = center)
+                drawCircle(color = middleColor, radius = 110.dp.toPx(), center = center)
+                drawCircle(color = innerColor, radius = 80.dp.toPx(), center = center)
+            }
         }
-
-        val micBg = when {
-            !enabled -> Color.Gray.copy(alpha = 0.7f)
-            appliedContrast -> accent
-            isProcessing -> GreenDark
-            else -> GreenDark
-        }
-        val micIcon = if (appliedContrast) Color.Black else Color.White
 
         Box(
             modifier = Modifier
