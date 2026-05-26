@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.recuperavc.ui.main.reports.type.ReportTab
@@ -120,13 +121,22 @@ private fun SegButton(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { onClick() }
-                .padding(vertical = 14.dp, horizontal = 8.dp),
+                .padding(vertical = 12.dp, horizontal = 6.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(26.dp))
+            Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(24.dp))
             Spacer(Modifier.height(6.dp))
-            Text(text, color = fg, fontWeight = FontWeight.Bold, fontSize = (13.sp * scale), textAlign = TextAlign.Center)
+            Text(
+                text = text,
+                color = fg,
+                fontWeight = FontWeight.Bold,
+                fontSize = (12.sp * scale),
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Visible
+            )
         }
     }
 }

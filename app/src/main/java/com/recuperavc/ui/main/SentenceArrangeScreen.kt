@@ -142,6 +142,12 @@ fun SentenceArrange(
     val results = remember { mutableStateListOf<RoundResult>() }
 
     if (showResults) {
+        BackHandler(enabled = true) {
+            sfx.play(Sfx.CLICK)
+            results.clear()
+            onBackToHome()
+        }
+
         var phraseMap by remember(results) { mutableStateOf<Map<java.util.UUID, String>>(emptyMap()) }
         LaunchedEffect(results) {
             val ids = results.map { it.phraseId }.distinct()
@@ -167,7 +173,10 @@ fun SentenceArrange(
             primaryBtnContent = accentText,
             secondaryBtnContainer = OliveDark,
             secondaryBtnContent = Color.White,
-            onBackToHome = { onBackToHome() },
+            onBackToHome = {
+                results.clear()
+                onBackToHome()
+            },
             onRestart = {
                 sfx.play(Sfx.CLICK)
                 results.clear()

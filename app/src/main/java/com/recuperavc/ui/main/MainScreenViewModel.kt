@@ -20,7 +20,10 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.recuperavc.media.decodeWaveFile
 import com.recuperavc.recorder.Recorder
 import com.recuperavc.ui.sfx.Sfx
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -54,6 +57,10 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
         private set
     var isCancelling by mutableStateOf(false)
         private set
+    var isCancellingTranscription by mutableStateOf(false)
+        private set
+    private var transcriptionJob: Job? = null
+    private var transcriptionCancelled: Boolean = false
     var modelLoadFailed by mutableStateOf(false)
         private set
     var transcriptionResult by mutableStateOf("")
@@ -82,7 +89,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
     )
     private val sessionItems = mutableListOf<SessionItem>()
 
-    data class SessionSummaryItem(val phrase: String, val wpm: Int, val wer: Double)
+    data class SessionSummaryItem(val phrase: String, val wpm: Int, val wer: Double, val transcribed: String)
     data class SessionSummary(val avgWpm: Float, val avgWer: Float, val items: List<SessionSummaryItem>)
     var sessionSummary by mutableStateOf<SessionSummary?>(null)
         private set
@@ -180,29 +187,50 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
 
         canTranscribe = false
         isProcessing = true
+        transcriptionCancelled = false
 
         try {
             withContext(highPerformanceDispatcher) {
                 boostProcessPriority()
-                
+
                 val data = readAudioSamples(file)
+
+                if (transcriptionCancelled) {
+                    withContext(NonCancellable) { discardCancelledTranscription(file) }
+                    return@withContext
+                }
+
                 val rawText = whisperContext?.transcribeData(data)?.trim() ?: ""
-                
+
+                if (transcriptionCancelled) {
+                    withContext(NonCancellable) { discardCancelledTranscription(file) }
+                    return@withContext
+                }
+
                 val cleanText = extractCleanText(rawText).lowercase()
-                
+
                 val analysis = if (cleanText.isNotEmpty()) calculateAnalysis(cleanText, recordingDurationMs) else null
+
+                if (transcriptionCancelled) {
+                    withContext(NonCancellable) { discardCancelledTranscription(file) }
+                    return@withContext
+                }
+
                 withContext(Dispatchers.Main) {
                     transcriptionResult = cleanText
                     analysisResult = analysis
                     isProcessing = false
                     _sfx.tryEmit(Sfx.PROCESSING_DONE) // Finished processing
                 }
-                if (analysis != null) {
+                if (!transcriptionCancelled && analysis != null) {
                     persistResults(file, recordingDurationMs, cleanText, analysis)
                 }
-                
+
                 restoreProcessPriority()
             }
+        } catch (e: CancellationException) {
+            withContext(NonCancellable) { discardCancelledTranscription(file) }
+            throw e
         } catch (e: Exception) {
             Log.w(LOG_TAG, e)
             withContext(Dispatchers.Main) {
@@ -212,13 +240,73 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
             restoreProcessPriority()
         }
 
-        viewModelScope.launch {
-            delay(800)
-            clearResults()
-            loadNewPhrase()
-            _sfx.tryEmit(Sfx.CLICK)
+        if (!transcriptionCancelled) {
+            viewModelScope.launch {
+                delay(800)
+                clearResults()
+                loadNewPhrase()
+                _sfx.tryEmit(Sfx.CLICK)
+            }
         }
         canTranscribe = true
+    }
+
+    private suspend fun discardCancelledTranscription(file: File) {
+        withContext(Dispatchers.IO) {
+            runCatching { if (file.exists()) file.delete() }
+        }
+        withContext(Dispatchers.Main) {
+            transcriptionResult = ""
+            analysisResult = null
+            isProcessing = false
+            isCancellingTranscription = false
+        }
+        restoreProcessPriority()
+        canTranscribe = true
+        recordedFile = null
+    }
+
+    fun cancelTranscription() {
+        if (!isProcessing) return
+        transcriptionCancelled = true
+        transcriptionJob?.cancel()
+        isProcessing = false
+        isCancellingTranscription = false
+        transcriptionResult = ""
+        analysisResult = null
+        canTranscribe = true
+        val file = recordedFile
+        recordedFile = null
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { if (file != null && file.exists()) file.delete() }
+        }
+        viewModelScope.launch {
+            loadNewPhrase()
+        }
+    }
+
+    fun resetForExit() {
+        if (isProcessing) {
+            transcriptionCancelled = true
+            isCancellingTranscription = false
+            transcriptionJob?.cancel()
+            recordedFile?.let { f -> runCatching { if (f.exists()) f.delete() } }
+        }
+        if (isRecording) {
+            viewModelScope.launch {
+                runCatching { recorder.stopRecording() }
+                isRecording = false
+            }
+            recordedFile?.let { f -> runCatching { if (f.exists()) f.delete() } }
+            recordedFile = null
+        }
+        sessionItems.clear()
+        sessionCount = 0
+        sessionSummary = null
+        transcriptionResult = ""
+        analysisResult = null
+        isProcessing = false
+        isCancellingTranscription = false
     }
 
     private suspend fun persistResults(
@@ -315,7 +403,7 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                     mainAudioFileId = mainFileId
                 )
                 database.audioReportDao().insertWithFiles(report, snapshot.map { it.audioId })
-                val items = snapshot.map { SessionSummaryItem(it.phraseText, it.wpm, it.wer) }
+                val items = snapshot.map { SessionSummaryItem(it.phraseText, it.wpm, it.wer, it.transcribed) }
                 sessionSummary = SessionSummary(avgWpm, avgWer, items)
                 _sfx.tryEmit(Sfx.RIGHT_ANSWER) // Salvo
                 true
@@ -357,7 +445,9 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                 _sfx.tryEmit(Sfx.STOP_RECORDING) // Finished recording
                 isRecording = false
                 val recordingDuration = System.currentTimeMillis() - recordingStartTime
-                recordedFile?.let { transcribeAudio(it, recordingDuration) }
+                recordedFile?.let { file ->
+                    transcriptionJob = viewModelScope.launch { transcribeAudio(file, recordingDuration) }
+                }
             } else {
                 stopPlayback()
                 transcriptionResult = ""
@@ -382,7 +472,9 @@ class MainScreenViewModel(private val application: Application) : ViewModel() {
                             if (shouldProcess) {
                                 _sfx.tryEmit(Sfx.STOP_RECORDING)  // Stop before processing
                                 val recordingDuration = System.currentTimeMillis() - recordingStartTime
-                                recordedFile?.let { transcribeAudio(it, recordingDuration) }
+                                recordedFile?.let { file ->
+                                    transcriptionJob = viewModelScope.launch { transcribeAudio(file, recordingDuration) }
+                                }
                             } else {
                                 // Silence detected, não gravou nada
                                 _sfx.tryEmit(Sfx.WRONG_ANSWER)

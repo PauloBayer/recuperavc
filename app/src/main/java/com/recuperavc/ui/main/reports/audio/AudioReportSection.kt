@@ -108,15 +108,15 @@ fun AudioReportSection(
                     DateTimeFormatter.ofPattern("dd/MM").format(local)
                 } else ""
             },
-            yAxisLabel = "WPM",
+            yAxisLabel = "Palavras/min",
             onBarClick = { idx -> items.getOrNull(idx)?.let { onSelectReport(it, ChartType.WPM) } },
             onBarTapSound = onBarTapSound
         )
     }
     Spacer(Modifier.height(16.dp))
-    ChartCard(title = "Erros de Fala", subtitle = "Porcentagem de erro (quanto menor, melhor)") {
+    ChartCard(title = "Precisão da Fala", subtitle = "Porcentagem de acerto (quanto maior, melhor)") {
         BarChart(
-            points = items.map { it.report.averageWordErrorRate },
+            points = items.map { (100f - it.report.averageWordErrorRate).coerceIn(0f, 100f) },
             labels = items.map { r ->
                 val date = r.files.minByOrNull { it.recordedAt ?: Instant.EPOCH }?.recordedAt
                 if (date != null) {
@@ -124,7 +124,7 @@ fun AudioReportSection(
                     DateTimeFormatter.ofPattern("dd/MM").format(local)
                 } else ""
             },
-            yAxisLabel = "WER (%)",
+            yAxisLabel = "Precisão (%)",
             onBarClick = { idx -> items.getOrNull(idx)?.let { onSelectReport(it, ChartType.WER) } },
             onBarTapSound = onBarTapSound
         )
@@ -330,14 +330,14 @@ fun AudioReportDetailDialog(
                                 when (chartType) {
                                     ChartType.WPM -> {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text("WPM", fontSize = (12.sp * appliedScale), fontWeight = FontWeight.SemiBold, color = p.textSecondary)
-                                            Text("${attempt.wpm}", fontSize = (14.sp * appliedScale), fontWeight = FontWeight.Bold, color = p.accent)
+                                            Text("Velocidade", fontSize = (12.sp * appliedScale), fontWeight = FontWeight.SemiBold, color = p.textSecondary)
+                                            Text("${attempt.wpm} palavras/min", fontSize = (14.sp * appliedScale), fontWeight = FontWeight.Bold, color = p.accent)
                                         }
                                     }
                                     ChartType.WER -> {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text("WER", fontSize = (12.sp * appliedScale), fontWeight = FontWeight.SemiBold, color = p.textSecondary)
-                                            Text("${String.format("%.1f", attempt.wer)}%", fontSize = (14.sp * appliedScale), fontWeight = FontWeight.Bold, color = p.accent)
+                                            Text("Precisão", fontSize = (12.sp * appliedScale), fontWeight = FontWeight.SemiBold, color = p.textSecondary)
+                                            Text("${String.format("%.1f", (100f - attempt.wer).coerceIn(0f, 100f))}%", fontSize = (14.sp * appliedScale), fontWeight = FontWeight.Bold, color = p.accent)
                                         }
                                     }
                                 }

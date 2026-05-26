@@ -183,8 +183,8 @@ fun MotionReportSection(
         return
     }
 
-    ChartCard(title = "Coordenação Motora", subtitle = "Toques por minuto (quanto maior, melhor)") {
-        BarChart(points = points, labels = labels, yAxisLabel = "Toques/min", onBarClick = null)
+    ChartCard(title = "Coordenação Motora", subtitle = "TPM — Toques por minuto (quanto maior, melhor)") {
+        BarChart(points = points, labels = labels, yAxisLabel = "TPM", onBarClick = null)
     }
 
     Spacer(Modifier.height(12.dp))
@@ -223,7 +223,7 @@ fun MotionReportSection(
                         Spacer(Modifier.height(8.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Toques/Minuto", fontSize = (13.sp * scale), fontWeight = FontWeight.SemiBold, color = p.textSecondary)
+                                Text("TPM (toques/min)", fontSize = (13.sp * scale), fontWeight = FontWeight.SemiBold, color = p.textSecondary)
                                 Text("${r.clicksPerMinute}", fontSize = (15.sp * scale), fontWeight = FontWeight.Bold, color = p.textPrimary)
                             }
                             Column(modifier = Modifier.weight(1f)) {

@@ -1,5 +1,6 @@
 package com.recuperavc.ui.main
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -60,6 +61,11 @@ fun ReportsScreen(
     val context = LocalContext.current
     val db = remember(context) { DbProvider.db(context) }
     val sfx = rememberSfxController()
+
+    BackHandler(enabled = true) {
+        sfx.play(Sfx.CLICK)
+        onBack()
+    }
 
     // Settings (iguais às outras telas)
     val settings: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context))

@@ -24,13 +24,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import kotlin.math.PI
@@ -142,6 +141,16 @@ fun AudioAnalysisScreen(
     }
 
     var showEndDialog by remember { mutableStateOf(false) }
+    var showCancelTranscriptionDialog by remember { mutableStateOf(false) }
+
+    val disposalActivity = context as? android.app.Activity
+    DisposableEffect(viewModel) {
+        onDispose {
+            if (disposalActivity?.isChangingConfigurations != true) {
+                viewModel.resetForExit()
+            }
+        }
+    }
 
     BackHandler(enabled = true) {
         sfx.play(Sfx.CLICK)
@@ -155,9 +164,11 @@ fun AudioAnalysisScreen(
         isProcessing = viewModel.isProcessing,
         phraseText = viewModel.phraseText,
         isCancelling = viewModel.isCancelling,
+        isCancellingTranscription = viewModel.isCancellingTranscription,
         sessionCount = viewModel.sessionCount,
         onRecordTapped = { sfx.play(Sfx.CLICK); viewModel.toggleRecord() },
         onCancelRecording = { viewModel.cancelRecording() },
+        onRequestCancelTranscription = { sfx.play(Sfx.CLICK); showCancelTranscriptionDialog = true },
         onFinishSession = {
             sfx.play(Sfx.CLICK)
             viewModel.finishSession { saved ->
@@ -172,6 +183,24 @@ fun AudioAnalysisScreen(
         textPrimary = textPrimary,
         accent = accent
     )
+
+    if (showCancelTranscriptionDialog) {
+        CancelTranscriptionDialog(
+            appliedContrast = appliedContrast,
+            appliedDark = appliedDark,
+            appliedScale = appliedScale,
+            accent = accent,
+            onConfirm = {
+                sfx.play(Sfx.CLICK)
+                viewModel.cancelTranscription()
+                showCancelTranscriptionDialog = false
+            },
+            onDismiss = {
+                sfx.play(Sfx.CLICK)
+                showCancelTranscriptionDialog = false
+            }
+        )
+    }
 
     if (showEndDialog) {
         EndSessionDialog(
@@ -309,9 +338,11 @@ private fun AudioAnalysisContent(
     isProcessing: Boolean,
     phraseText: String,
     isCancelling: Boolean,
+    isCancellingTranscription: Boolean,
     sessionCount: Int,
     onRecordTapped: () -> Unit,
     onCancelRecording: () -> Unit,
+    onRequestCancelTranscription: () -> Unit,
     onFinishSession: () -> Unit,
     onBack: () -> Unit,
     appliedContrast: Boolean,
@@ -441,20 +472,19 @@ private fun AudioAnalysisContent(
                     enter = fadeIn(),
                     exit = fadeOut()
                 ) {
-                    TapToRecordHint(appliedScale = appliedScale)
+                    TapToRecordHint(
+                        text = "Toque no microfone para começar",
+                        appliedScale = appliedScale
+                    )
                 }
                 AnimatedVisibility(
                     visible = isRecording && !isProcessing && !isCancelling,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
+                    enter = fadeIn(),
+                    exit = fadeOut()
                 ) {
-                    Text(
-                        text = "Toque novamente para enviar",
-                        fontSize = 16.sp * appliedScale,
-                        fontWeight = FontWeight.Medium,
-                        color = textPrimary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(top = 10.dp)
+                    TapToRecordHint(
+                        text = "Toque no microfone para enviar",
+                        appliedScale = appliedScale
                     )
                 }
 
@@ -530,7 +560,7 @@ private fun AudioAnalysisContent(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.35f))
+                    .background(Color.Black.copy(alpha = 0.55f))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -538,24 +568,130 @@ private fun AudioAnalysisContent(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(64.dp),
-                        color = textPrimary,
+                        color = Color.White,
                         strokeWidth = 6.dp
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        text = "Analisando sua gravação...",
+                        text = if (isCancellingTranscription) "Cancelando envio do áudio..." else "Analisando sua gravação...",
                         fontSize = 18.sp * appliedScale,
                         fontWeight = FontWeight.Medium,
-                        color = textPrimary,
+                        color = Color.White,
                         textAlign = TextAlign.Center
                     )
+                    if (!isCancellingTranscription) {
+                        Spacer(Modifier.height(28.dp))
+                        Button(
+                            onClick = onRequestCancelTranscription,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = when {
+                                    appliedContrast -> Color(0xFFFF5252)
+                                    appliedDark -> Color(0xFFB71C1C)
+                                    else -> Color(0xFFD32F2F)
+                                },
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(18.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = null,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = "Cancelar envio do áudio",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp * appliedScale
+                            )
+                        }
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun CancelTranscriptionDialog(
+    appliedContrast: Boolean,
+    appliedDark: Boolean,
+    appliedScale: Float,
+    accent: Color,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val container = when {
+        appliedContrast -> Color.Black
+        appliedDark -> Color(0xFF1E1E1E)
+        else -> Color.White
+    }
+    val titleColor = when {
+        appliedContrast -> accent
+        appliedDark -> Color.White
+        else -> Color(0xFF1B1B1B)
+    }
+    val bodyColor = if (appliedContrast || appliedDark) Color.White else Color(0xFF3A3A3A)
+    val confirmContainer = when {
+        appliedContrast -> Color(0xFFFF5252)
+        appliedDark -> Color(0xFFB71C1C)
+        else -> Color(0xFFD32F2F)
+    }
+    val dismissContent = when {
+        appliedContrast -> accent
+        appliedDark -> Color(0xFF8BC34A)
+        else -> GreenDark
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = container,
+        titleContentColor = titleColor,
+        textContentColor = bodyColor,
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = confirmContainer,
+                    contentColor = Color.White
+                ),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Text("Cancelar envio", fontSize = 16.sp * appliedScale, fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(contentColor = dismissContent)
+            ) { Text("Continuar análise", fontSize = 16.sp * appliedScale) }
+        },
+        title = {
+            Text(
+                "Cancelar envio do áudio?",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 20.sp * appliedScale
+            )
+        },
+        text = {
+            Text(
+                "Se cancelar agora, esta tentativa não será contabilizada nem armazenada. Tem certeza?",
+                fontSize = 15.sp * appliedScale,
+                lineHeight = 20.sp * appliedScale
+            )
+        }
+    )
 }
 
 /* --------------------------- Recording UI --------------------------- */
@@ -653,6 +789,7 @@ private fun RecordingPill(
 
 @Composable
 private fun TapToRecordHint(
+    text: String,
     appliedScale: Float
 ) {
     val color = Color.White
@@ -672,16 +809,16 @@ private fun TapToRecordHint(
             contentDescription = null,
             tint = color,
             modifier = Modifier
-                .size(32.dp)
+                .size(34.dp)
                 .offset(y = (-arrowOffset).dp)
         )
         Text(
-            text = "Toque no microfone para começar",
-            fontSize = 16.sp * appliedScale,
-            fontWeight = FontWeight.Medium,
+            text = text,
+            fontSize = 17.sp * appliedScale,
+            fontWeight = FontWeight.SemiBold,
             color = color,
             textAlign = TextAlign.Center,
-            lineHeight = 22.sp * appliedScale
+            lineHeight = 24.sp * appliedScale
         )
     }
 }
@@ -742,18 +879,12 @@ private fun RecordingCircles(
         barColor = Color.White
     }
 
-    val recordingBg = when {
-        appliedContrast -> Color(0xFFFF5252)
-        appliedDark -> Color(0xFFB71C1C)
-        else -> Color(0xFFD32F2F)
-    }
     val micBg = when {
         !enabled -> Color.Gray.copy(alpha = 0.7f)
-        isRecording -> recordingBg
         appliedContrast -> accent
         else -> GreenDark
     }
-    val micIcon = if (appliedContrast && !isRecording) Color.Black else Color.White
+    val micIcon = if (appliedContrast) Color.Black else Color.White
 
     Box(modifier = Modifier.size(300.dp), contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.size(300.dp)) {
@@ -973,64 +1104,279 @@ private fun ModelLoadErrorScreen(
 }
 
 @Composable
-private fun MetricCard(
+private fun BigMetric(
     title: String,
     value: String,
     unit: String,
     color: Color,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     appliedContrast: Boolean,
+    appliedDark: Boolean,
     appliedScale: Float,
-    appliedDark: Boolean = false
+    modifier: Modifier = Modifier
 ) {
     val container = when {
         appliedContrast -> Color.Black
         appliedDark -> Color(0xFF2A2A2A)
-        else -> Color.White.copy(alpha = 0.95f)
+        else -> Color(0xFFF7F7F7)
     }
     val border = when {
         appliedContrast -> BorderStroke(2.dp, color)
-        appliedDark -> BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-        else -> null
+        appliedDark -> BorderStroke(1.dp, Color.White.copy(alpha = 0.10f))
+        else -> BorderStroke(1.dp, Color(0xFFE6E6E6))
     }
     val titleColor = when {
-        appliedContrast -> Color.White.copy(alpha = 0.8f)
+        appliedContrast -> Color.White.copy(alpha = 0.85f)
         appliedDark -> Color(0xFFCCCCCC)
-        else -> Color.Gray.copy(alpha = 0.8f)
-    }
-    val valueColor = when {
-        appliedContrast -> Color.White
-        appliedDark -> Color.White
-        else -> color
+        else -> Color(0xFF555555)
     }
     val unitColor = when {
-        appliedContrast -> Color.White.copy(alpha = 0.7f)
-        appliedDark -> Color(0xFFCCCCCC)
-        else -> color.copy(alpha = 0.7f)
+        appliedContrast -> Color.White.copy(alpha = 0.70f)
+        appliedDark -> Color(0xFFAAAAAA)
+        else -> Color(0xFF777777)
     }
 
     Card(
-        modifier = Modifier.width(140.dp),
+        modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = container),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 8.dp),
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 2.dp),
         border = border
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp),
+                .padding(vertical = 18.dp, horizontal = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(24.dp))
+            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(28.dp))
             Spacer(Modifier.height(8.dp))
-            Text(text = title, fontSize = 13.sp * appliedScale, fontWeight = FontWeight.Medium, color = titleColor)
-            Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(text = value, fontSize = 26.sp * appliedScale, fontWeight = FontWeight.Bold, color = valueColor)
-                Text(text = " $unit", fontSize = 14.sp * appliedScale, fontWeight = FontWeight.Medium, color = unitColor)
+            Text(
+                text = title,
+                fontSize = 15.sp * appliedScale,
+                fontWeight = FontWeight.SemiBold,
+                color = titleColor,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = value,
+                fontSize = 36.sp * appliedScale,
+                fontWeight = FontWeight.ExtraBold,
+                color = color
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = unit,
+                fontSize = 13.sp * appliedScale,
+                fontWeight = FontWeight.Medium,
+                color = unitColor,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+private fun ComparisonRow(
+    label: String,
+    youValue: String,
+    avgValue: String,
+    isBetter: Boolean,
+    diffText: String,
+    appliedContrast: Boolean,
+    accent: Color,
+    bodyColor: Color,
+    labelColor: Color,
+    scale: Float
+) {
+    val goodColor = if (appliedContrast) Color(0xFFA5D6A7) else Color(0xFF2E7D32)
+    val badColor = if (appliedContrast) Color(0xFFFF8A80) else Color(0xFFD32F2F)
+    val badgeColor = if (isBetter) goodColor else badColor
+    val badgeBg = badgeColor.copy(alpha = if (appliedContrast) 0.22f else 0.14f)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            fontSize = 16.sp * scale,
+            fontWeight = FontWeight.Bold,
+            color = bodyColor
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Você",
+                    fontSize = 12.sp * scale,
+                    color = labelColor,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = youValue,
+                    fontSize = 17.sp * scale,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = accent
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "Média brasileira",
+                    fontSize = 12.sp * scale,
+                    color = labelColor,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = avgValue,
+                    fontSize = 17.sp * scale,
+                    fontWeight = FontWeight.Bold,
+                    color = bodyColor
+                )
             }
         }
+        Spacer(Modifier.height(8.dp))
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .background(badgeBg)
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            Text(
+                text = diffText,
+                fontSize = 13.sp * scale,
+                fontWeight = FontWeight.Bold,
+                color = badgeColor
+            )
+        }
+    }
+}
+
+@Composable
+private fun AttemptCard(
+    index: Int,
+    expected: String,
+    transcribed: String,
+    wpm: Int,
+    wer: Double,
+    container: Color,
+    border: BorderStroke?,
+    accent: Color,
+    bodyColor: Color,
+    labelColor: Color,
+    appliedContrast: Boolean,
+    appliedDark: Boolean,
+    scale: Float
+) {
+    val precision = (100.0 - wer).coerceIn(0.0, 100.0)
+    val statBg = when {
+        appliedContrast -> Color.White.copy(alpha = 0.06f)
+        appliedDark -> Color.White.copy(alpha = 0.04f)
+        else -> Color(0xFFEFEFEF)
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = container),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 1.dp),
+        border = border
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Text(
+                text = "Tentativa $index",
+                fontSize = 13.sp * scale,
+                fontWeight = FontWeight.Bold,
+                color = labelColor,
+                letterSpacing = 0.5.sp
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "Frase apresentada",
+                fontSize = 12.sp * scale,
+                fontWeight = FontWeight.SemiBold,
+                color = labelColor
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = expected,
+                fontSize = 16.sp * scale,
+                fontWeight = FontWeight.SemiBold,
+                color = bodyColor,
+                lineHeight = 22.sp * scale
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "O que você disse",
+                fontSize = 12.sp * scale,
+                fontWeight = FontWeight.SemiBold,
+                color = labelColor
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = if (transcribed.isNotBlank()) transcribed else "—",
+                fontSize = 16.sp * scale,
+                fontWeight = FontWeight.SemiBold,
+                color = accent,
+                lineHeight = 22.sp * scale
+            )
+            Spacer(Modifier.height(14.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                AttemptStat(
+                    label = "Velocidade",
+                    value = "$wpm palavras/min",
+                    accent = accent,
+                    bg = statBg,
+                    labelColor = labelColor,
+                    scale = scale,
+                    modifier = Modifier.weight(1f)
+                )
+                AttemptStat(
+                    label = "Precisão",
+                    value = "${String.format("%.0f", precision)}%",
+                    accent = accent,
+                    bg = statBg,
+                    labelColor = labelColor,
+                    scale = scale,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AttemptStat(
+    label: String,
+    value: String,
+    accent: Color,
+    bg: Color,
+    labelColor: Color,
+    scale: Float,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(bg)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Text(
+            text = label,
+            fontSize = 11.sp * scale,
+            color = labelColor,
+            fontWeight = FontWeight.Medium
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = value,
+            fontSize = 15.sp * scale,
+            color = accent,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -1045,41 +1391,72 @@ private fun SessionSummaryScreen(
     onClose: () -> Unit,
     onNavigateHome: () -> Unit
 ) {
-    val cardContainer = when {
+    val sheetBg = when {
         appliedContrast -> Color.Black
         appliedDark -> Color(0xFF1E1E1E)
         else -> Color.White
+    }
+    val innerCardBg = when {
+        appliedContrast -> Color(0xFF0B0B0B)
+        appliedDark -> Color(0xFF2A2A2A)
+        else -> Color(0xFFF7F7F7)
     }
     val titleColor = when {
         appliedContrast -> accent
         appliedDark -> Color.White
         else -> Color(0xFF1B1B1B)
     }
-    val labelColor = when {
-        appliedContrast -> Color.White
-        appliedDark -> Color(0xFFEDEDED)
-        else -> Color(0xFF3A3A3A)
-    }
-    val itemCardContainer = when {
-        appliedContrast -> Color.Black
-        appliedDark -> Color(0xFF2A2A2A)
-        else -> Color(0xFFF5F5F5)
-    }
-    val itemTextColor = when {
+    val bodyColor = when {
         appliedContrast -> Color.White
         appliedDark -> Color(0xFFEDEDED)
         else -> Color(0xFF1B1B1B)
     }
-    val cardBorder = when {
-        appliedContrast -> BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
-        appliedDark -> BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+    val labelColor = when {
+        appliedContrast -> Color.White.copy(alpha = 0.85f)
+        appliedDark -> Color(0xFFB0B0B0)
+        else -> Color(0xFF666666)
+    }
+    val sheetBorder = when {
+        appliedContrast -> BorderStroke(1.dp, Color.White.copy(alpha = 0.20f))
+        appliedDark -> BorderStroke(1.dp, Color.White.copy(alpha = 0.10f))
         else -> null
+    }
+    val innerBorder = when {
+        appliedContrast -> BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
+        appliedDark -> BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+        else -> BorderStroke(1.dp, Color(0xFFE6E6E6))
+    }
+
+    val ctx = LocalContext.current
+    val brWpm = kotlin.runCatching { ctx.getString(R.string.br_avg_wpm).replace(",", ".").toDouble() }.getOrElse { 150.0 }
+    val brWer = kotlin.runCatching { ctx.getString(R.string.br_avg_wer).replace(",", ".").toDouble() }.getOrElse { 12.0 }
+    val wpmUser = summary.avgWpm.toDouble()
+    val werUser = summary.avgWer.toDouble()
+    val userPrecision = (100.0 - werUser).coerceIn(0.0, 100.0)
+    val brPrecision = (100.0 - brWer).coerceIn(0.0, 100.0)
+
+    val wpmAbove = wpmUser >= brWpm * 1.1
+    val wpmBelow = wpmUser <= brWpm * 0.9
+    val werBetter = werUser <= brWer
+    val werMuchBetter = werUser <= brWer * 0.9
+    val werWorse = werUser >= brWer * 1.1
+    val (headline, body) = when {
+        wpmAbove && (werMuchBetter || werBetter) ->
+            "Ótimo ritmo" to "Sua velocidade está acima da referência com boa precisão. Mantenha a prática regular e avance para frases mais longas quando se sentir confortável."
+        wpmBelow && (werMuchBetter || werBetter) ->
+            "Base sólida" to "Boa precisão. Agora, aumente a velocidade gradualmente: repita a frase, respire fundo e tente manter um ritmo contínuo."
+        wpmAbove && werWorse ->
+            "Ajuste fino" to "Velocidade alta, mas com mais erros. Diminua um pouco o ritmo e articule cada palavra com calma para melhorar a precisão."
+        wpmBelow && werWorse ->
+            "Seguimos juntos" to "É normal oscilar. Comece com frases curtas, foque em respirar e pronunciar com clareza. A velocidade vem com a prática."
+        else ->
+            "Bom caminho" to "Você está próximo da referência. Continue praticando e ajuste suavemente ritmo e articulação para evoluir."
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.35f))
+            .background(Color.Black.copy(alpha = 0.55f))
     ) {
         Box(
             modifier = Modifier
@@ -1087,213 +1464,234 @@ private fun SessionSummaryScreen(
                 .windowInsetsPadding(WindowInsets.systemBars),
             contentAlignment = Alignment.Center
         ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = cardContainer),
-            elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 6.dp),
-            border = cardBorder
-        ) {
-            Column(
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = sheetBg),
+                elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 10.dp),
+                border = sheetBorder
             ) {
-                Text(
-                    "Relatório do Teste",
-                    fontSize = 22.sp * appliedScale,
-                    fontWeight = FontWeight.Bold,
-                    color = titleColor
-                )
-                Spacer(Modifier.height(16.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    MetricCard(
-                        title = "Velocidade média",
-                        value = String.format("%.0f", summary.avgWpm),
-                        unit = "WPM",
-                        color = accent,
-                        icon = Icons.Default.Speed,
-                        appliedContrast = appliedContrast,
-                        appliedScale = appliedScale,
-                        appliedDark = appliedDark
-                    )
-                    MetricCard(
-                        title = "Precisão média",
-                        value = String.format("%.1f", 100 - summary.avgWer),
-                        unit = "%",
-                        color = accent,
-                        icon = Icons.Default.TrendingUp,
-                        appliedContrast = appliedContrast,
-                        appliedScale = appliedScale,
-                        appliedDark = appliedDark
-                    )
-                }
-                Spacer(Modifier.height(16.dp))
-                val ctx = LocalContext.current
-                val brWpm = kotlin.runCatching { ctx.getString(R.string.br_avg_wpm).replace(",", ".").toDouble() }.getOrElse { 150.0 }
-                val brWer = kotlin.runCatching { ctx.getString(R.string.br_avg_wer).replace(",", ".").toDouble() }.getOrElse { 12.0 }
-                val wpmUser = summary.avgWpm.toDouble()
-                val werUser = summary.avgWer.toDouble()
-                val goodColor = if (appliedContrast) accent else Color(0xFF2E7D32)
-                val badColor = if (appliedContrast) Color(0xFFFF8A80) else Color(0xFFD32F2F)
-                val goodBg = if (appliedContrast) accent.copy(alpha = 0.2f) else goodColor.copy(alpha = 0.15f)
-                val badBg = badColor.copy(alpha = 0.15f)
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = itemCardContainer),
-                    shape = RoundedCornerShape(14.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 1.dp),
-                    border = if (appliedContrast) BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)) else if (appliedDark) BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)) else null
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
-                        Text("Referência (PT-BR)", fontWeight = FontWeight.SemiBold, color = labelColor, fontSize = 14.sp * appliedScale)
-                        Spacer(Modifier.height(10.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("WPM", fontWeight = FontWeight.Medium, color = itemTextColor, fontSize = 12.sp * appliedScale)
-                                Spacer(Modifier.height(6.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text("BR: ${String.format("%.0f", brWpm)}", color = labelColor, fontSize = 12.sp * appliedScale)
-                                    Text("Você: ${String.format("%.0f", wpmUser)}", color = accent, fontSize = 12.sp * appliedScale)
-                                }
-                                Spacer(Modifier.height(6.dp))
-                                val wpmAbove = wpmUser >= brWpm
-                                val wpmDiffPct = if (brWpm > 0) ((wpmUser - brWpm) / brWpm * 100.0) else 0.0
-                                Card(
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = if (wpmAbove) goodBg else badBg)
-                                ) {
-                                    Text(
-                                        text = if (wpmAbove) "Acima da média (+${String.format("%.0f", wpmDiffPct)}%)" else "Abaixo da média (${String.format("%.0f", wpmDiffPct)}%)",
-                                        color = if (wpmAbove) goodColor else badColor,
-                                        fontSize = 12.sp * appliedScale,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                    )
-                                }
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("WER", fontWeight = FontWeight.Medium, color = itemTextColor, fontSize = 12.sp * appliedScale)
-                                Spacer(Modifier.height(6.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text("BR: ${String.format("%.1f", brWer)}%", color = labelColor, fontSize = 12.sp * appliedScale)
-                                    Text("Você: ${String.format("%.1f", werUser)}%", color = accent, fontSize = 12.sp * appliedScale)
-                                }
-                                Spacer(Modifier.height(6.dp))
-                                val werBetter = werUser <= brWer
-                                val werDiffPct = if (brWer > 0) ((brWer - werUser) / brWer * 100.0) else 0.0
-                                Card(
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = if (werBetter) goodBg else badBg)
-                                ) {
-                                    Text(
-                                        text = if (werBetter) "Melhor que a média (+${String.format("%.0f", werDiffPct)}%)" else "Pior que a média (${String.format("%.0f", -werDiffPct)}%)",
-                                        color = if (werBetter) goodColor else badColor,
-                                        fontSize = 12.sp * appliedScale,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                    )
-                                }
+                    Text(
+                        text = "Resultado da sessão",
+                        fontSize = 26.sp * appliedScale,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = titleColor,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(20.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        BigMetric(
+                            title = "Velocidade",
+                            value = String.format("%.0f", wpmUser),
+                            unit = "palavras/min",
+                            color = accent,
+                            icon = Icons.Default.Speed,
+                            appliedContrast = appliedContrast,
+                            appliedDark = appliedDark,
+                            appliedScale = appliedScale,
+                            modifier = Modifier.weight(1f)
+                        )
+                        BigMetric(
+                            title = "Precisão",
+                            value = String.format("%.0f", userPrecision),
+                            unit = "%",
+                            color = accent,
+                            icon = Icons.Default.CheckCircle,
+                            appliedContrast = appliedContrast,
+                            appliedDark = appliedDark,
+                            appliedScale = appliedScale,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    val dividerColor = when {
+                        appliedContrast -> Color.White.copy(alpha = 0.18f)
+                        appliedDark -> Color.White.copy(alpha = 0.10f)
+                        else -> Color(0xFFE0E0E0)
+                    }
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = innerCardBg),
+                        elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 1.dp),
+                        border = innerBorder
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(18.dp)) {
+                            Text(
+                                text = "Comparação com a média brasileira",
+                                fontSize = 14.sp * appliedScale,
+                                fontWeight = FontWeight.Bold,
+                                color = labelColor,
+                                letterSpacing = 0.3.sp
+                            )
+                            Spacer(Modifier.height(14.dp))
+                            val wpmDiffPct = if (brWpm > 0) ((wpmUser - brWpm) / brWpm * 100.0) else 0.0
+                            ComparisonRow(
+                                label = "Velocidade",
+                                youValue = "${String.format("%.0f", wpmUser)} palavras/min",
+                                avgValue = "${String.format("%.0f", brWpm)} palavras/min",
+                                isBetter = wpmUser >= brWpm,
+                                diffText = if (wpmUser >= brWpm)
+                                    "Acima da média (+${String.format("%.0f", wpmDiffPct)}%)"
+                                else
+                                    "Abaixo da média (${String.format("%.0f", wpmDiffPct)}%)",
+                                appliedContrast = appliedContrast,
+                                accent = accent,
+                                bodyColor = bodyColor,
+                                labelColor = labelColor,
+                                scale = appliedScale
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            val precDiffPct = if (brPrecision > 0) ((userPrecision - brPrecision) / brPrecision * 100.0) else 0.0
+                            ComparisonRow(
+                                label = "Precisão",
+                                youValue = "${String.format("%.0f", userPrecision)}%",
+                                avgValue = "${String.format("%.0f", brPrecision)}%",
+                                isBetter = userPrecision >= brPrecision,
+                                diffText = if (userPrecision >= brPrecision)
+                                    "Acima da média (+${String.format("%.0f", precDiffPct)}%)"
+                                else
+                                    "Abaixo da média (${String.format("%.0f", precDiffPct)}%)",
+                                appliedContrast = appliedContrast,
+                                accent = accent,
+                                bodyColor = bodyColor,
+                                labelColor = labelColor,
+                                scale = appliedScale
+                            )
+
+                            Spacer(Modifier.height(20.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(dividerColor)
+                            )
+                            Spacer(Modifier.height(18.dp))
+
+                            Text(
+                                text = headline,
+                                fontSize = 19.sp * appliedScale,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = accent
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = body,
+                                fontSize = 15.sp * appliedScale,
+                                color = bodyColor,
+                                lineHeight = 22.sp * appliedScale
+                            )
+                            Spacer(Modifier.height(14.dp))
+                            Text(
+                                text = "Dicas",
+                                fontSize = 13.sp * appliedScale,
+                                fontWeight = FontWeight.Bold,
+                                color = labelColor,
+                                letterSpacing = 0.3.sp
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            listOf(
+                                "Respire com calma antes de falar",
+                                "Articule cada sílaba claramente",
+                                "Comece devagar e aumente o ritmo aos poucos"
+                            ).forEach {
+                                Text(
+                                    text = "•  $it",
+                                    fontSize = 14.sp * appliedScale,
+                                    color = bodyColor,
+                                    lineHeight = 20.sp * appliedScale
+                                )
                             }
                         }
                     }
-                }
-                Spacer(Modifier.height(12.dp))
-                val wpmAbove = wpmUser >= brWpm * 1.1
-                val wpmBelow = wpmUser <= brWpm * 0.9
-                val werBetter = werUser <= brWer * 1.0
-                val werMuchBetter = werUser <= brWer * 0.9
-                val werWorse = werUser >= brWer * 1.1
-                val headline: String
-                val body: String
-                when {
-                    wpmAbove && (werMuchBetter || werBetter) -> {
-                        headline = "Ótimo ritmo"
-                        body = "Sua velocidade está acima da referência com boa precisão. Mantenha a prática regular e avance para frases mais longas quando se sentir confortável."
+
+                    Spacer(Modifier.height(20.dp))
+
+                    Text(
+                        text = "Suas tentativas",
+                        fontSize = 18.sp * appliedScale,
+                        fontWeight = FontWeight.Bold,
+                        color = titleColor,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Start
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    summary.items.forEachIndexed { idx, item ->
+                        AttemptCard(
+                            index = idx + 1,
+                            expected = item.phrase,
+                            transcribed = item.transcribed,
+                            wpm = item.wpm,
+                            wer = item.wer,
+                            container = innerCardBg,
+                            border = innerBorder,
+                            accent = accent,
+                            bodyColor = bodyColor,
+                            labelColor = labelColor,
+                            appliedContrast = appliedContrast,
+                            appliedDark = appliedDark,
+                            scale = appliedScale
+                        )
+                        if (idx < summary.items.size - 1) Spacer(Modifier.height(10.dp))
                     }
-                    wpmBelow && (werMuchBetter || werBetter) -> {
-                        headline = "Base sólida"
-                        body = "Boa precisão. Agora, aumente a velocidade gradualmente: repita a frase, respire fundo e tente manter um ritmo contínuo."
-                    }
-                    wpmAbove && werWorse -> {
-                        headline = "Ajuste fino"
-                        body = "Velocidade alta, mas com mais erros. Diminua um pouco o ritmo e articule cada palavra com calma para melhorar a precisão."
-                    }
-                    wpmBelow && werWorse -> {
-                        headline = "Seguimos juntos"
-                        body = "É normal oscilar. Comece com frases curtas, foque em respirar e pronunciar com clareza. A velocidade vem com a prática."
-                    }
-                    else -> {
-                        headline = "Bom caminho"
-                        body = "Você está próximo da referência. Continue praticando e ajuste suavemente ritmo e articulação para evoluir."
-                    }
-                }
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = itemCardContainer),
-                    shape = RoundedCornerShape(14.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 1.dp),
-                    border = if (appliedContrast) BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)) else if (appliedDark) BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)) else null
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
-                        Text(headline, fontWeight = FontWeight.Bold, color = accent, fontSize = 16.sp * appliedScale)
-                        Spacer(Modifier.height(6.dp))
-                        Text(body, color = itemTextColor, fontSize = 14.sp * appliedScale)
-                        Spacer(Modifier.height(8.dp))
-                        Text("Dicas rápidas", fontWeight = FontWeight.SemiBold, color = labelColor, fontSize = 12.sp * appliedScale)
-                        Spacer(Modifier.height(4.dp))
-                        Text("• Respiração tranquila antes de falar", color = itemTextColor, fontSize = 12.sp * appliedScale)
-                        Text("• Articule sílabas com clareza", color = itemTextColor, fontSize = 12.sp * appliedScale)
-                        Text("• Comece devagar e aumente o ritmo aos poucos", color = itemTextColor, fontSize = 12.sp * appliedScale)
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
-                Text("Tentativas", fontWeight = FontWeight.SemiBold, color = labelColor)
-                Spacer(Modifier.height(8.dp))
-                summary.items.forEachIndexed { idx, item ->
-                    Card(
+
+                    Spacer(Modifier.height(24.dp))
+
+                    Button(
+                        onClick = onClose,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = accent,
+                            contentColor = if (appliedContrast) Color.Black else Color.White
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        colors = CardDefaults.cardColors(containerColor = itemCardContainer),
-                        shape = RoundedCornerShape(12.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = if (appliedContrast || appliedDark) 0.dp else 1.dp),
-                        border = if (appliedContrast) BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)) else if (appliedDark) BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)) else null
+                            .height(58.dp),
+                        shape = RoundedCornerShape(18.dp)
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text("${idx + 1}. ${item.phrase}", fontWeight = FontWeight.Medium, color = itemTextColor)
-                            Spacer(Modifier.height(6.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                Text("WPM: ${item.wpm}", color = accent)
-                                Text("Precisão: ${String.format("%.1f", 100 - item.wer)}%", color = accent)
-                            }
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text = "Fazer novo teste",
+                            fontSize = 17.sp * appliedScale,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = onNavigateHome,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = accent),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = RoundedCornerShape(18.dp)
+                    ) {
+                        Text(
+                            text = "Voltar ao início",
+                            fontSize = 16.sp * appliedScale,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
-                Spacer(Modifier.height(20.dp))
-                Button(
-                    onClick = onClose,
-                    colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = if (appliedContrast) Color.Black else Color.White),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Icon(imageVector = Icons.Default.Mic, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Novo teste", fontSize = 16.sp * appliedScale)
-                }
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = onNavigateHome,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = accent),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp)
-                ) { Text("Voltar ao Início", fontSize = 16.sp * appliedScale) }
             }
-        }
         }
     }
 }
