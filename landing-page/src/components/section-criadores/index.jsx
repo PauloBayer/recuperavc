@@ -1,7 +1,7 @@
 import './index.css'
 import bayer from '../assets/img/bayer.jpg'
 import fellipe from '../assets/img/fellipe.jpg'
-import nina from '../assets/img/nina.jpg'
+import brawerman from '../assets/img/brawerman.jpg'
 
 export default function SectionCriadores(){
     const autores = [
@@ -11,11 +11,18 @@ export default function SectionCriadores(){
         linkedin: 'https://www.linkedin.com/in/gabrielfellipe/',
         foto: fellipe,
         },
+        // Desabilitado por enquanto. Janaina ajudou no projeto de TCC.
+        // {
+        // nome: 'Janaina Fonseca Nogueira',
+        // funcao: 'Desenvolvedora',
+        // linkedin: 'https://www.linkedin.com/in/janaina-nogueira-926368181/',
+        // foto: nina,
+        // },
         {
-        nome: 'Janaina Fonseca Nogueira',
-        funcao: 'Desenvolvedora',
-        linkedin: 'https://www.linkedin.com/in/janaina-nogueira-926368181/',
-        foto: nina,
+        nome: 'Alessandro Brawerman',
+        funcao: 'Orientador do Projeto',
+        linkedin: 'https://www.linkedin.com/in/brawerman/',
+        foto: brawerman,
         },
         {
         nome: 'Paulo Eduardo Bayer Kresko',
