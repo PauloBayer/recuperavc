@@ -183,7 +183,7 @@ private fun drawChartCard(
     valueFormatter: (Float) -> String
 ) {
     val plotHeight = 150f
-    val headerHeight = 46f
+    val headerHeight = 70f
     val xLabelHeight = 22f
     val padding = 14f
     val blockHeight = headerHeight + plotHeight + xLabelHeight + padding * 2f
@@ -199,11 +199,11 @@ private fun drawChartCard(
     val innerRight = cardRect.right - padding
     val innerTop = cardRect.top + padding
 
-    c.drawText(title, innerLeft, innerTop + 13f, paint(14f, COLOR_TEXT_PRIMARY, bold = true))
-    c.drawText(subtitle, innerLeft, innerTop + 28f, paint(10.5f, COLOR_TEXT_LABEL))
-    c.drawText(yAxisLabel, innerLeft, innerTop + 44f, paint(9.5f, COLOR_GREEN_DARK, bold = true))
+    c.drawText(title, innerLeft, innerTop + 14f, paint(14f, COLOR_TEXT_PRIMARY, bold = true))
+    c.drawText(subtitle, innerLeft, innerTop + 32f, paint(10.5f, COLOR_TEXT_LABEL))
+    c.drawText(yAxisLabel, innerLeft, innerTop + 58f, paint(10f, COLOR_GREEN_DARK, bold = true))
 
-    val plotLeft = innerLeft + 36f
+    val plotLeft = innerLeft + 40f
     val plotRight = innerRight - 4f
     val plotTop = innerTop + headerHeight
     val plotBottom = plotTop + plotHeight

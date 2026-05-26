@@ -90,16 +90,19 @@ fun BarChart(
 
     Column(modifier = Modifier.fillMaxWidth()) {
         // y-axis label
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Box(modifier = Modifier.width(56.dp).height(17.dp), contentAlignment = Alignment.BottomStart) {
-                if (yAxisLabel != null) {
-                    Text(yAxisLabel, fontSize = 11.sp, color = p.textSecondary)
-                }
+        if (yAxisLabel != null) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = yAxisLabel,
+                    fontSize = 11.sp,
+                    color = p.textSecondary,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    softWrap = false
+                )
             }
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(6.dp))
         }
-
-        Spacer(Modifier.height(6.dp))
 
         Row(modifier = Modifier.fillMaxWidth().height(plotHeight)) {
             // Y ticks
