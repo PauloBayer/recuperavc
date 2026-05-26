@@ -22,6 +22,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
@@ -380,18 +382,6 @@ private fun AudioAnalysisContent(
             BackButton(onBack, tint = if (appliedContrast || appliedDark) Color.White else OnBackground)
         }
 
-        if (!isLoading) {
-            Text(
-                text = "Sessão ${sessionCount} de 3 (mínimo)",
-                color = textPrimary,
-                fontSize = 18.sp * appliedScale,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier
-                    .padding(top = 72.dp + WindowInsets.statusBars.asPaddingValues().calculateTopPadding())
-                    .align(Alignment.TopCenter)
-            )
-        }
-
         if (isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -411,13 +401,29 @@ private fun AudioAnalysisContent(
                 }
             }
         } else {
+            val scrollState = rememberScrollState()
+            var bottomAreaHeightPx by remember { mutableStateOf(0) }
+            val density = LocalDensity.current
+            val bottomAreaHeightDp = with(density) { bottomAreaHeightPx.toDp() }
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .verticalScroll(scrollState)
                     .padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(Modifier.height(140.dp))
+                Spacer(Modifier.height(64.dp))
+
+                Text(
+                    text = "Sessão ${sessionCount} de 3 (mínimo)",
+                    color = textPrimary,
+                    fontSize = 18.sp * appliedScale,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(Modifier.height(32.dp))
 
                 Text(
                     text = "Pronuncie a frase abaixo:",
@@ -438,7 +444,7 @@ private fun AudioAnalysisContent(
                     accent = accent
                 )
 
-                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.height(36.dp))
 
                 AnimatedVisibility(
                     visible = isRecording && !isProcessing && !isCancelling,
@@ -451,7 +457,15 @@ private fun AudioAnalysisContent(
                             appliedDark = appliedDark,
                             appliedScale = appliedScale
                         )
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            text = "Toque no microfone novamente para enviar",
+                            color = textPrimary.copy(alpha = 0.85f),
+                            fontSize = 13.sp * appliedScale,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(16.dp))
                     }
                 }
 
@@ -467,6 +481,19 @@ private fun AudioAnalysisContent(
                     accent = accent
                 )
 
+                Spacer(Modifier.height(bottomAreaHeightDp + 16.dp))
+            }
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .onSizeChanged { bottomAreaHeightPx = it.height }
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 18.dp, bottom = 14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
                 AnimatedVisibility(
                     visible = !isRecording && !isProcessing && !isCancelling,
                     enter = fadeIn(),
@@ -477,80 +504,58 @@ private fun AudioAnalysisContent(
                         appliedScale = appliedScale
                     )
                 }
-                AnimatedVisibility(
-                    visible = isRecording && !isProcessing && !isCancelling,
-                    enter = fadeIn(),
-                    exit = fadeOut()
-                ) {
-                    TapToRecordHint(
-                        text = "Toque no microfone para enviar",
-                        appliedScale = appliedScale
-                    )
+
+                if (sessionCount >= 3) {
+                    Button(
+                        onClick = onFinishSession,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (appliedContrast) accent else Color.White,
+                            contentColor = if (appliedContrast) Color.Black else Color(0xFF2E7D32)
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(54.dp)
+                    ) {
+                        Text(
+                            text = "Registrar e Salvar Sessão",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp * appliedScale
+                        )
+                    }
                 }
 
-                Spacer(Modifier.weight(1f))
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp)
+                AnimatedVisibility(
+                    visible = isRecording,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
                 ) {
-                    if (sessionCount >= 3) {
-                        Button(
-                            onClick = onFinishSession,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (appliedContrast) accent else Color.White,
-                                contentColor = if (appliedContrast) Color.Black else Color(0xFF2E7D32)
-                            ),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp)
-                                .height(56.dp)
-                        ) {
-                            Text(
-                                text = "Registrar e Salvar Sessão",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp * appliedScale
-                            )
-                        }
-                    }
-
-                    AnimatedVisibility(
-                        visible = isRecording,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
+                    Button(
+                        onClick = onCancelRecording,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = when {
+                                appliedContrast -> Color(0xFFFF5252)
+                                appliedDark -> Color(0xFFB71C1C)
+                                else -> Color(0xFFD32F2F)
+                            },
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(54.dp)
                     ) {
-                        Button(
-                            onClick = onCancelRecording,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = when {
-                                    appliedContrast -> Color(0xFFFF5252)
-                                    appliedDark -> Color(0xFFB71C1C)
-                                    else -> Color(0xFFD32F2F)
-                                },
-                                contentColor = Color.White
-                            ),
-                            shape = RoundedCornerShape(18.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp)
-                                .height(64.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                text = "Cancelar gravação",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 17.sp * appliedScale
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "Cancelar gravação",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp * appliedScale
+                        )
                     }
                 }
             }

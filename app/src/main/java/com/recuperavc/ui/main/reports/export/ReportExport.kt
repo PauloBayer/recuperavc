@@ -501,18 +501,24 @@ private fun drawCoherenceSection(w: PdfWriter, items: List<CoherenceReport>) {
     }
 
     val avgTime = items.map { it.averageTimePerTry }.average().toFloat()
-    val avgTries = items.map { it.averageErrorsPerTry }.average().toFloat()
-    val totalGroups = items.sumOf { runCatching { parseCoherenceReportGroups(it.allTestsDescription).size }.getOrDefault(0) }
-    val correctGroups = items.sumOf {
-        runCatching { parseCoherenceReportGroups(it.allTestsDescription).count { g -> g.success } }.getOrDefault(0)
+    val allGroups = items.flatMap {
+        runCatching { parseCoherenceReportGroups(it.allTestsDescription) }.getOrDefault(emptyList())
     }
-    val successRate = if (totalGroups > 0) correctGroups.toFloat() / totalGroups.toFloat() * 100f else 0f
+    val totalTries = allGroups.sumOf { it.tries.size }
+    val correctTries = allGroups.sumOf { g -> g.tries.count { t -> t.correct } }
+    val incorrectTries = totalTries - correctTries
+    val successRate = if (totalTries > 0) correctTries.toFloat() / totalTries.toFloat() * 100f else 0f
 
     drawSectionTitle(w, "Resumo do período", null)
     drawSummaryStrip(w, listOf(
         Triple("Testes realizados", items.size.toString(), COLOR_GREEN_DARK),
         Triple("Tempo médio", String.format("%.1fs", avgTime), COLOR_GREEN_DARK),
         Triple("Taxa de acerto", "${successRate.toInt()}%", COLOR_GREEN_DARK)
+    ))
+    drawSummaryStrip(w, listOf(
+        Triple("Tentativas totais", totalTries.toString(), COLOR_GREEN_DARK),
+        Triple("Acertos", correctTries.toString(), COLOR_GREEN_DARK),
+        Triple("Erros", incorrectTries.toString(), COLOR_GREEN_DARK)
     ))
 
     drawSectionTitle(w, "Gráficos de Raciocínio", "Acompanhamento dos testes")
@@ -548,16 +554,20 @@ private fun drawCoherenceSection(w: PdfWriter, items: List<CoherenceReport>) {
 
     sorted.reversed().forEachIndexed { idx, r ->
         val groups = runCatching { parseCoherenceReportGroups(r.allTestsDescription) }.getOrDefault(emptyList())
-        val correct = groups.count { it.success }
-        val rate = if (groups.isNotEmpty()) correct.toFloat() / groups.size.toFloat() * 100f else 0f
+        val totalT = groups.sumOf { it.tries.size }
+        val correctT = groups.sumOf { g -> g.tries.count { t -> t.correct } }
+        val incorrectT = totalT - correctT
+        val rate = if (totalT > 0) correctT.toFloat() / totalT.toFloat() * 100f else 0f
         drawKeyValueCard(
             w = w,
             title = "Teste ${sorted.size - idx} — ${r.date.fmt("dd/MM/yyyy 'às' HH:mm")}",
             cells = listOf(
                 "Tempo médio" to String.format("%.1fs", r.averageTimePerTry),
-                "Tentativas médias" to String.format("%.1f", r.averageErrorsPerTry),
-                "Frases" to groups.size.toString(),
-                "Taxa de acerto" to "${rate.toInt()}%"
+                "Frases montadas" to groups.size.toString(),
+                "Tentativas totais" to totalT.toString(),
+                "Taxa de acerto" to "${rate.toInt()}%",
+                "Acertos" to correctT.toString(),
+                "Erros" to incorrectT.toString()
             ),
             accentColor = COLOR_GREEN_DARK
         )
