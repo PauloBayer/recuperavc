@@ -60,7 +60,7 @@ android {
         resources { excludes += '/META-INF/{AL2.0,LGPL2.1}' }
     }
 
-    ndkVersion "25.2.9519653"
+    ndkVersion "30.0.14904198"
 
     externalNativeBuild {
         cmake {
